@@ -1,0 +1,1082 @@
+BUILD A COMPLETE PERSONAL AI OPERATING SYSTEM
+1. PROJECT OVERVIEW
+Build a production-quality full-stack web application called:
+**Personal AI OS**
+The application should work as an **AGI-inspired personal AI operating system** that can understand high-level user goals, create plans, break goals into tasks, select specialized agents, use tools, retrieve information from memory/files, execute tasks, verify results, ask for human approval when necessary, and learn from previous interactions.
+This must NOT be a simple chatbot.
+The core concept is:
+**User Goal → Understanding → Planning → Task Decomposition → Agent Selection → Tool Use → Execution → Verification → Memory → Replanning**
+The system should have a polished, modern AI operating-system-style interface.
+2. IMPORTANT PRODUCT POSITIONING
+Do not claim that this is true Artificial General Intelligence.
+Use wording such as:
+
+- "AGI-inspired Personal AI Operating System"
+- "Autonomous AI workspace"
+- "Agentic Personal AI OS"
+
+The application should demonstrate:
+
+- Agentic AI
+- Multi-agent orchestration
+- Planning
+- Tool calling
+- Long-term memory
+- RAG
+- Reflection
+- Self-correction
+- Task decomposition
+- Human-in-the-loop
+- Autonomous execution
+- Replanning
+
+3. TECHNOLOGY STACK
+Frontend
+Use:
+
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- React Router
+- TanStack Query
+- Lucide React icons
+- Recharts where charts are needed
+
+Do NOT use plain JavaScript.
+Do NOT use Next.js unless there is a very strong technical reason.
+The frontend must be responsive for:
+
+- Desktop
+- Tablet
+- Mobile
+
+Desktop should be the primary experience.
+4. BACKEND
+Use:
+
+- Python 3.11+
+- FastAPI
+- Pydantic
+- Motor / PyMongo for MongoDB
+- LangGraph for agent orchestration
+- LangChain components only where useful
+- JWT authentication
+- bcrypt/passlib for password hashing
+
+Use async FastAPI patterns wherever appropriate.
+Backend must be modular and maintainable.
+Do NOT put the entire backend into one Python file.
+5. AI / LLM ARCHITECTURE
+Create an abstraction layer for LLM providers.
+Example:
+LLMProvider
+ ├── OpenAIProvider
+ ├── GroqProvider
+ └── Future providers
+
+The application should primarily use OpenAI through an environment variable.
+Example:
+OPENAI_API_KEY=
+OPENAI_MODEL=
+
+Never hard-code API keys.
+The system should gracefully handle missing API keys and display a useful configuration error.
+6. AGENT ARCHITECTURE
+Create the following core agents.
+6.1 Planner Agent
+Responsibilities:
+
+- Understand user's high-level goal
+- Determine intent
+- Analyze complexity
+- Break goal into tasks
+- Determine task dependencies
+- Select required agents/tools
+- Create execution plan
+
+Example:
+User:
+"Help me prepare for an AI Engineer interview."
+Planner creates:
+Goal:
+Prepare for AI Engineer interview
+
+Tasks:
+
+1. Analyze job description
+2. Identify required skills
+3. Compare with user profile
+4. Identify skill gaps
+5. Create study plan
+6. Generate interview questions
+7. Conduct mock interview
+8. Evaluate performance
+9. Recommend improvements
+
+6.2 Research Agent
+Responsibilities:
+
+- Search available web/search tools
+- Gather information
+- Summarize findings
+- Cite sources where applicable
+- Detect duplicate information
+- Evaluate source quality
+
+6.3 Task Agent
+Responsibilities:
+
+- Create tasks
+- Update task status
+- Prioritize tasks
+- Mark tasks completed
+- Detect failed tasks
+- Manage dependencies
+
+6.4 File Agent
+Responsibilities:
+
+- Process uploaded documents
+- Extract text
+- Search documents
+- Answer questions using documents
+- Provide relevant document references
+
+Supported initial file types:
+
+- PDF
+- TXT
+- DOCX
+- CSV
+
+6.5 Memory Agent
+Responsibilities:
+
+- Store useful long-term user information
+- Retrieve relevant memories
+- Decide whether information is worth remembering
+- Avoid storing unnecessary information
+- Update existing memories
+
+Memory categories:
+preferences
+goals
+projects
+work_style
+important_facts
+past_decisions
+learned_information
+
+6.6 Critic / Verification Agent
+Responsibilities:
+
+- Review agent output
+- Detect mistakes
+- Check completeness
+- Verify task completion
+- Decide whether to accept or reject output
+
+Output:
+{
+  "approved": true,
+  "score": 0.92,
+  "issues": [],
+  "recommendation": "complete"
+}
+
+If rejected:
+Agent Output
+      ↓
+Critic
+      ↓
+REJECT
+      ↓
+Planner
+      ↓
+Retry / Replan
+
+6.7 Communication Agent
+Initially support:
+
+- Email drafting
+- Message drafting
+- Communication summarization
+
+Do NOT automatically send emails without user approval.
+7. AGENT ORCHESTRATION
+Use LangGraph.
+Create a graph similar to:
+USER REQUEST
+     ↓
+INTENT ANALYZER
+     ↓
+PLANNER
+     ↓
+TASK DECOMPOSER
+     ↓
+AGENT ROUTER
+     ↓
+┌────┼─────┬──────┬──────┐
+↓    ↓     ↓      ↓      ↓
+Research File  Memory  Task Communication
+     │    Agent   Agent  Agent
+     └────┼──────┼──────┘
+          ↓
+       EXECUTION
+          ↓
+         CRITIC
+          ↓
+    ┌─────┴─────┐
+    ↓           ↓
+ APPROVED      REJECTED
+    ↓           ↓
+ MEMORY      REPLAN
+    ↓           ↓
+ COMPLETE ←─────┘
+
+The graph must maintain state.
+Create a structured AgentState containing information such as:
+user_id
+conversation_id
+goal_id
+current_task
+plan
+tasks
+agent_outputs
+tool_results
+memory_context
+file_context
+approval_required
+critic_result
+errors
+final_response
+
+8. TOOL SYSTEM
+Create a centralized tool registry.
+Initial tools:
+web_search
+file_search
+memory_search
+memory_save
+create_task
+update_task
+get_tasks
+get_goal
+create_goal
+draft_email
+get_current_time
+calculator
+
+Each tool should have:
+
+- name
+- description
+- input schema
+- output schema
+- permission level
+
+The AI should dynamically decide which tool to use.
+Do NOT allow arbitrary code execution in the initial MVP.
+9. HUMAN-IN-THE-LOOP
+Create an approval system.
+Low-risk actions can execute automatically:
+search web
+read files
+summarize
+create task
+update task
+save memory
+
+Sensitive actions must require approval:
+send email
+delete data
+submit application
+external account actions
+
+Example:
+AI wants to perform:
+
+Send email to ABC Company
+
+[Approve] [Reject]
+
+The agent workflow must pause while waiting for approval.
+After approval, continue execution.
+10. MEMORY SYSTEM
+Implement two memory levels.
+Short-Term Memory
+Conversation/session context.
+Long-Term Memory
+Persist useful information in MongoDB.
+Example document:
+{
+  "user_id": "...",
+  "type": "preference",
+  "content": "User prefers concise professional emails",
+  "importance": 0.85,
+  "created_at": "...",
+  "updated_at": "..."
+}
+
+Use embeddings for semantic retrieval.
+Do NOT blindly save every conversation message as memory.
+Create a memory extraction step that decides what is useful.
+11. RAG SYSTEM
+Users can upload documents.
+Pipeline:
+Upload
+ ↓
+Text Extraction
+ ↓
+Cleaning
+ ↓
+Chunking
+ ↓
+Embedding
+ ↓
+Vector Store
+ ↓
+Retrieval
+ ↓
+LLM
+
+Use ChromaDB initially.
+Create:
+documents
+document_chunks
+
+Collections/indexes must be isolated by user.
+A user must never retrieve another user's documents.
+12. DATABASE / ERD
+Use MongoDB collections:
+users
+goals
+tasks
+agents
+agent_runs
+memories
+files
+document_chunks
+tools
+conversations
+messages
+approvals
+
+Relationships:
+User
+ ├── Goals
+ │     └── Tasks
+ │            └── Agent Runs
+ │                    └── Agents
+ │
+ ├── Memories
+ │
+ ├── Files
+ │     └── Document Chunks
+ │
+ └── Conversations
+        └── Messages
+
+Agents
+ └── Tools
+
+Tasks
+ └── Approvals
+
+Use indexes for:
+
+- user_id
+- email
+- goal_id
+- task_id
+- conversation_id
+- created_at
+- status
+
+13. AUTHENTICATION
+Implement:
+
+- Signup
+- Login
+- Logout
+- Current user
+- Protected routes
+- JWT access token
+- Password hashing
+
+Frontend routes:
+/login
+/signup
+/app
+/app/tasks
+/app/goals
+/app/memory
+/app/files
+/app/agents
+/app/tools
+/app/settings
+
+Unauthenticated users must not access the application dashboard.
+14. FRONTEND DESIGN
+The UI must feel like a **premium AI operating system**, NOT a generic SaaS dashboard.
+Design direction:
+
+- Dark modern interface
+- Professional
+- Minimal
+- Elegant
+- High-end AI product aesthetic
+- Subtle glassmorphism
+- Soft borders
+- Smooth animations
+- Good whitespace
+- Clear typography
+
+Avoid:
+
+- excessive gradients
+- childish illustrations
+- excessive rounded cards
+- huge unnecessary text
+- clutter
+
+Use subtle animations only.
+15. APPLICATION LAYOUT
+Desktop:
+┌─────────────────────────────────────────────────────┐
+│ AI OS                               Profile / ⚙     │
+├───────────────┬─────────────────────────────────────┤
+│               │                                     │
+│ 🧠 AI OS      │             MAIN CONTENT            │
+│               │                                     │
+│ Home          │                                     │
+│ Chat          │                                     │
+│ Goals         │                                     │
+│ Tasks         │                                     │
+│ Memory        │                                     │
+│ Files         │                                     │
+│ Agents        │                                     │
+│ Tools         │                                     │
+│ Activity      │                                     │
+│ Settings      │                                     │
+│               │                                     │
+└───────────────┴─────────────────────────────────────┘
+
+16. HOME DASHBOARD
+Create an excellent dashboard.
+Header:
+Good morning
+
+What do you want to accomplish today?
+
+Large AI input:
+┌───────────────────────────────────────────────┐
+│ Ask your AI OS anything...                    │
+│                                               │
+│                            [Run]               │
+└───────────────────────────────────────────────┘
+
+Suggested prompts:
+Plan my week
+Find information about...
+Analyze my files
+Prepare me for an interview
+Create a task
+Summarize my priorities
+
+Below:
+Active Goals
+Show:
+Goal
+Progress
+Deadline
+Tasks
+Status
+
+Today's Tasks
+Show:
+○ Research AI companies
+✓ Update CV
+○ Prepare interview questions
+
+AI Activity
+Show live events:
+10:32
+Research Agent started
+
+10:33
+Found 12 sources
+
+10:34
+Critic verified research
+
+10:35
+Task completed
+
+17. CHAT INTERFACE
+Chat should NOT look like a basic ChatGPT clone.
+Show:
+User Request
+     ↓
+AI Plan
+     ↓
+Tasks
+     ↓
+Agent execution
+     ↓
+Result
+
+For complex tasks display an expandable:
+**"AI is working..."**
+Inside show:
+✓ Understanding request
+✓ Creating plan
+✓ Research Agent
+✓ Memory retrieval
+⟳ Critic reviewing
+
+Do NOT expose chain-of-thought.
+Only show safe execution status summaries.
+18. GOALS PAGE
+Allow user to:
+
+- Create goal
+- Edit goal
+- Delete goal
+- Set deadline
+- Set priority
+- View progress
+- View related tasks
+
+Goal detail:
+Goal
+────────────────────────
+Get an AI Engineer job
+
+Progress: 62%
+
+Tasks
+✓ Update CV
+✓ Update portfolio
+✓ Find jobs
+⟳ Apply to jobs
+○ Interview preparation
+
+AI Recommendation:
+Focus on RAG and Agentic AI preparation.
+
+19. TASKS PAGE
+Include:
+
+- All
+- Today
+- Upcoming
+- Completed
+- Failed
+
+Each task:
+Task title
+Description
+Priority
+Status
+Due date
+Assigned agent
+Goal
+
+Allow drag/drop priority if practical.
+20. MEMORY PAGE
+Create a beautiful memory interface.
+Sections:
+Preferences
+Important Facts
+Projects
+Work Style
+Past Decisions
+
+Example:
+User Preference
+
+"Prefers concise professional communication."
+
+Importance
+████████░░ 82%
+
+[Edit] [Delete]
+
+Users must have control over their stored memories.
+21. FILES PAGE
+Allow:
+
+- Upload
+- Delete
+- Search
+- Preview metadata
+- Ask AI about files
+
+Display:
+CV.pdf
+Portfolio.pdf
+Project_Report.pdf
+
+Show processing status:
+Uploading
+Processing
+Indexed
+Failed
+
+22. AGENTS PAGE
+Show available agents:
+Planner Agent
+Research Agent
+Task Agent
+Memory Agent
+File Agent
+Critic Agent
+Communication Agent
+
+Each card:
+Agent Name
+Status: Active
+
+Purpose
+Tools
+Recent Runs
+Success Rate
+
+Agent detail page should show execution history.
+23. TOOLS PAGE
+Display registered tools:
+Web Search
+File Search
+Memory Search
+Task Manager
+Email Drafting
+Calculator
+
+Each tool should have:
+
+- Description
+- Permission level
+- Enabled/disabled
+- Last used
+
+24. ACTIVITY PAGE
+Create an execution timeline.
+Example:
+Today
+
+10:42
+Goal created
+
+10:43
+Planner generated 6 tasks
+
+10:44
+Research Agent started
+
+10:45
+12 sources retrieved
+
+10:46
+Critic approved result
+
+10:47
+Goal progress updated
+
+25. API DESIGN
+Create clean REST endpoints.
+Authentication:
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me
+
+Goals:
+POST /api/goals
+GET  /api/goals
+GET  /api/goals/{id}
+PUT  /api/goals/{id}
+DELETE /api/goals/{id}
+
+Tasks:
+POST /api/tasks
+GET  /api/tasks
+GET  /api/tasks/{id}
+PUT  /api/tasks/{id}
+DELETE /api/tasks/{id}
+
+AI:
+POST /api/ai/chat
+POST /api/ai/execute
+POST /api/ai/plan
+
+Memory:
+GET /api/memory
+POST /api/memory
+PUT /api/memory/{id}
+DELETE /api/memory/{id}
+
+Files:
+POST /api/files/upload
+GET /api/files
+DELETE /api/files/{id}
+POST /api/files/search
+
+Agents:
+GET /api/agents
+GET /api/agents/{id}
+GET /api/agents/{id}/runs
+
+Approvals:
+GET /api/approvals
+POST /api/approvals/{id}/approve
+POST /api/approvals/{id}/reject
+
+26. ERROR HANDLING
+Every agent/tool must have:
+
+- timeout
+- retry logic
+- structured errors
+- logging
+- failure state
+
+If an agent fails:
+Agent Failed
+ ↓
+Error captured
+ ↓
+Retry
+ ↓
+If retry fails
+ ↓
+Critic / Planner
+ ↓
+Alternative strategy
+
+Never leave the UI stuck indefinitely.
+27. SECURITY
+Implement:
+
+- password hashing
+- JWT authentication
+- CORS configuration
+- environment variables
+- user-level data isolation
+- input validation
+- file type validation
+- file size limits
+- safe tool permissions
+
+Never expose:
+
+- API keys
+- internal prompts
+- private user data
+- another user's files
+- another user's memories
+
+Do not expose hidden chain-of-thought.
+28. LOGGING / OBSERVABILITY
+Create structured logs for:
+
+- request
+- agent start
+- agent completion
+- tool call
+- tool failure
+- task creation
+- task completion
+- critic decision
+
+Store useful execution metadata in agent_runs.
+29. ENVIRONMENT VARIABLES
+Create .env.example.
+Example:
+OPENAI_API_KEY=
+OPENAI_MODEL=
+MONGODB_URI=
+MONGODB_DATABASE=personal_ai_os
+JWT_SECRET=
+CHROMA_HOST=
+FRONTEND_URL=
+
+Never commit .env.
+Create .gitignore.
+30. PROJECT STRUCTURE
+Use:
+personal-ai-os/
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   │
+│   │   ├── api/
+│   │   ├── agents/
+│   │   ├── workflows/
+│   │   ├── tools/
+│   │   ├── memory/
+│   │   ├── rag/
+│   │   ├── models/
+│   │   ├── database/
+│   │   ├── services/
+│   │   └── utils/
+│   │
+│   ├── tests/
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── layouts/
+│   │   ├── services/
+│   │   ├── hooks/
+│   │   ├── types/
+│   │   └── utils/
+│   ├── package.json
+│   └── .env.example
+│
+├── README.md
+└── .gitignore
+
+31. MVP PRIORITY
+Do NOT attempt every advanced integration immediately.
+Build in this exact order:
+Phase 1
+
+1. Project setup
+2. Authentication
+3. MongoDB
+4. Dashboard
+5. Chat
+6. Goals
+7. Tasks
+
+Phase 2
+
+8. Planner Agent
+9. Task Decomposition
+10. Agent Router
+11. Task Agent
+12. Agent execution tracking
+
+Phase 3
+
+13. Memory
+14. File upload
+15. RAG
+16. Research Agent
+17. Critic Agent
+
+Phase 4
+
+18. Human approval
+19. Replanning
+20. Activity timeline
+21. Advanced agent monitoring
+
+Phase 5
+
+22. Gmail integration
+23. Google Calendar
+24. Google Drive
+25. Browser automation
+26. More specialized agents
+
+32. IMPORTANT IMPLEMENTATION RULE
+The application must be genuinely functional.
+Do NOT create fake buttons that only display success messages.
+If a feature cannot be fully implemented because an external API requires credentials:
+
+- create the correct integration architecture
+- provide .env.example
+- show a clear configuration state
+- keep the rest of the application functional
+
+Do NOT hard-code fake AI responses.
+33. DEMO SCENARIO
+The application must support this end-to-end demo:
+User enters:
+"Help me prepare for an AI Engineer interview."
+System should:
+
+1. Understand the goal
+2. Create a goal
+3. Generate a plan
+4. Create multiple tasks
+5. Assign appropriate agents
+6. Retrieve relevant user memories
+7. Search uploaded documents if available
+8. Execute research
+9. Generate interview preparation material
+10. Run critic verification
+11. Update task statuses
+12. Store useful information in memory
+13. Show the entire safe execution timeline in the UI
+
+The user should be able to see that the AI is actually performing a workflow rather than simply generating one response.
+34. SECOND DEMO SCENARIO
+User:
+"Analyze my CV and tell me what I should improve for AI Engineer jobs."
+System should:
+File Agent
+ ↓
+Read CV
+ ↓
+RAG Retrieval
+ ↓
+Research Agent
+ ↓
+Analyze AI Engineer requirements
+ ↓
+Planner
+ ↓
+Gap Analysis
+ ↓
+Critic
+ ↓
+Final Recommendations
+
+35. QUALITY REQUIREMENTS
+The final application must have:
+
+- Clean TypeScript
+- Clean Python
+- Type-safe API communication
+- Reusable React components
+- Responsive UI
+- Loading states
+- Empty states
+- Error states
+- Toast notifications
+- Form validation
+- Proper authentication
+- Proper API error handling
+- No console errors
+- No broken routes
+- No placeholder lorem ipsum
+- No fake agent execution
+- No hard-coded secrets
+
+36. README
+Create a professional README containing:
+
+1. Project overview
+2. Features
+3. Architecture
+4. Tech stack
+5. Agent architecture
+6. ERD
+7. Setup instructions
+8. Environment variables
+9. Backend commands
+10. Frontend commands
+11. MongoDB setup
+12. ChromaDB setup
+13. API documentation
+14. Example workflows
+15. Future improvements
+
+Include architecture diagrams using Mermaid where useful.
+37. DEVELOPMENT COMMANDS
+Backend should run with:
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+Frontend:
+cd frontend
+npm install
+npm run dev
+
+FastAPI Swagger should be available at:
+/docs
+
+38. FINAL ACCEPTANCE CRITERIA
+Before considering the project complete, verify:
+Authentication
+
+- Signup works
+- Login works
+- Protected routes work
+- Logout works
+
+AI
+
+- Chat works
+- Planner works
+- Task decomposition works
+- Agent routing works
+- Agent execution works
+- Critic works
+- Replanning works
+
+Memory
+
+- Memory can be created
+- Memory retrieval works
+- Memory is user-specific
+
+RAG
+
+- PDF upload works
+- Text extraction works
+- Embeddings work
+- Retrieval works
+- AI answers based on uploaded documents
+
+Tasks
+
+- Create
+- Update
+- Complete
+- Delete
+- Filter
+- Prioritize
+
+Goals
+
+- Create
+- Track progress
+- Connect tasks
+- Complete
+
+UI
+
+- Responsive
+- Modern
+- No broken pages
+- No console errors
+
+Security
+
+- Passwords hashed
+- JWT protected APIs
+- Secrets in environment variables
+- User data isolated
+
+39. IMPORTANT FINAL INSTRUCTION TO MANUS
+Do not just generate a UI mockup.
+Build the **complete working application**.
+First inspect the project environment and repository.
+If an existing project exists, preserve useful existing code and integrate into it instead of unnecessarily rebuilding everything.
+Work incrementally:
+
+1. Create architecture
+2. Implement backend foundation
+3. Implement frontend foundation
+4. Connect frontend/backend
+5. Implement AI orchestration
+6. Implement memory/RAG
+7. Implement verification
+8. Test every workflow
+9. Fix errors
+10. Polish UI
+11. Create README
+
+After implementation, run the application and test the main user journeys.
+Do not stop after generating files.
+The final result must be a **functional, professional, portfolio-ready AGI-inspired Personal AI Operating System**, not a prototype with fake functionality.
