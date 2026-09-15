@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": { "@/*": ["./*"], "@shared/*": ["./shared/*"] }
+  },
+  "include": ["App.tsx", "Home.tsx", "main.tsx", "index.css", "routers.ts", "db.ts", "schema.ts", "trpc.ts", "useAuth.ts", "llm.ts", "env.ts", "vite-env.d.ts", "drizzle/**/*.ts", "shared/**/*.ts", "_core/**/*.ts", "components/**/*.tsx", "contexts/**/*.tsx", "lib/**/*.ts", "pages/**/*.tsx", "hooks/**/*.ts", "personal-ai-os.test.ts"],
+  "exclude": ["node_modules", "dist", "DashboardLayout.tsx", "Map.tsx", "test-plan-my-week.ts", "server"]
+}

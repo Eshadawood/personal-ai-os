@@ -22,6 +22,7 @@ import {
   ListChecks,
   Lock,
   Menu,
+  MessageCircle,
   MoreHorizontal,
   Network,
   Plus,
@@ -39,7 +40,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-type PageKey = "overview" | "goals" | "tasks" | "memory" | "files" | "agents" | "activity" | "tools" | "settings";
+type PageKey = "overview" | "chat" | "goals" | "tasks" | "memory" | "files" | "agents" | "activity" | "tools" | "settings";
 type DemoTask = { id: number; title: string; description: string; status: "todo" | "in_progress" | "completed"; priority: "low" | "medium" | "high"; agent: string; goalId?: number | null };
 type DemoGoal = { id: number; title: string; description: string | null; status: "active" | "completed" | "paused"; priority: "low" | "medium" | "high"; progress: number };
 type DemoEvent = { id: number; title: string; description: string | null; eventType: string; agent: string | null; createdAt: Date };
@@ -47,6 +48,7 @@ type DemoEvent = { id: number; title: string; description: string | null; eventT
 const navGroups = [
   { label: "Workspace", items: [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "chat", label: "Chat", icon: MessageCircle },
     { key: "goals", label: "Goals", icon: Target },
     { key: "tasks", label: "Tasks", icon: ListChecks },
   ] },
@@ -102,7 +104,7 @@ function SectionHeader({ eyebrow, title, detail, action }: { eyebrow: string; ti
 }
 
 export default function Home() {
-  const { user, loading: authLoading, isAuthenticated, logout } = useAuth();
+  const { user, loading: authLoading, isAuthenticated, logout, refresh } = useAuth();
   const [, setLocation] = useLocation();
   const [page, setPage] = useState<PageKey>(() => {
     const segment = window.location.pathname.split("/").filter(Boolean).pop();
@@ -113,6 +115,12 @@ export default function Home() {
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [stage, setStage] = useState(0);
   const [localTasks, setLocalTasks] = useState(demoTasks);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const authMutation = trpc.auth.login.useMutation({ onSuccess: () => { refresh(); toast.success("Welcome back"); }, onError: error => toast.error(error.message) });
+  const signupMutation = trpc.auth.signup.useMutation({ onSuccess: () => { refresh(); toast.success("Account created"); }, onError: error => toast.error(error.message) });
 
   const dashboardQuery = trpc.dashboard.get.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const workflow = trpc.dashboard.runWorkflow.useMutation({
@@ -138,9 +146,9 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [workflow.isPending]);
 
-  const liveGoals = (dashboardQuery.data?.goals?.length ? dashboardQuery.data.goals : demoGoals) as DemoGoal[];
-  const liveTasks = (dashboardQuery.data?.tasks?.length ? dashboardQuery.data.tasks : localTasks) as DemoTask[];
-  const liveEvents = (dashboardQuery.data?.activity?.length ? dashboardQuery.data.activity : demoEvents) as DemoEvent[];
+  const liveGoals = (dashboardQuery.data?.goals ?? []) as DemoGoal[];
+  const liveTasks = (dashboardQuery.data?.tasks ?? []) as DemoTask[];
+  const liveEvents = (dashboardQuery.data?.activity ?? []) as DemoEvent[];
   const activeGoal = liveGoals[0];
   const completedTasks = liveTasks.filter(task => task.status === "completed").length;
   const firstName = (user?.name || "Alex").split(" ")[0];
@@ -175,6 +183,7 @@ export default function Home() {
 
   const view = useMemo(() => {
     if (page === "goals") return <GoalsView goals={liveGoals} />;
+    if (page === "chat") return <ChatView />;
     if (page === "tasks") return <TasksView tasks={liveTasks} onToggle={toggleLocalTask} />;
     if (page === "memory") return <MemoryView />;
     if (page === "files") return <FilesView />;
@@ -197,7 +206,7 @@ export default function Home() {
       {mobileOpen && <button aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-black/60 lg:hidden" />}
       <main className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/[0.07] bg-[#070b12]/80 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white lg:hidden"><Menu className="h-5 w-5" /></button><div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><Command className="h-3.5 w-3.5" /><span>Workspace</span><ChevronRight className="h-3 w-3" /><span className="text-slate-300">{page === "overview" ? "Overview" : page[0].toUpperCase() + page.slice(1)}</span></div><div className="sm:hidden"><p className="text-sm font-semibold text-white">{page === "overview" ? "Overview" : page[0].toUpperCase() + page.slice(1)}</p></div></div><div className="flex items-center gap-3"><button onClick={() => toast("Command palette", { description: "Keyboard shortcuts are coming to your workspace." })} className="hidden items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-xs text-slate-500 transition hover:border-white/20 hover:text-slate-300 md:flex"><Search className="h-3.5 w-3.5" />Search<span className="ml-3 rounded border border-white/10 px-1.5 py-0.5 text-[9px]">⌘ K</span></button><button onClick={() => submitPrompt("Plan my week around the highest impact work") } className="hidden items-center gap-2 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 active:scale-[0.98] sm:flex"><Plus className="h-3.5 w-3.5" />New run</button><button onClick={() => navigate("settings")} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-violet-400 to-fuchsia-500 text-[11px] font-bold text-white">{initials(user?.name)}</button></div></header>
-        <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">{authLoading ? <div className="grid min-h-[70vh] place-items-center"><div className="flex items-center gap-3 text-sm text-slate-400"><span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />Loading workspace...</div></div> : view}</div>
+        <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">{authLoading ? <div className="grid min-h-[70vh] place-items-center"><div className="flex items-center gap-3 text-sm text-slate-400"><span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />Loading workspace...</div></div> : <>{!isAuthenticated && <AuthPanel mode={authMode} setMode={setAuthMode} name={authName} setName={setAuthName} email={authEmail} setEmail={setAuthEmail} password={authPassword} setPassword={setAuthPassword} pending={authMutation.isPending || signupMutation.isPending} onSubmit={() => authMode === "login" ? authMutation.mutate({ email: authEmail, password: authPassword }) : signupMutation.mutate({ name: authName, email: authEmail, password: authPassword })} />}{view}</>}</div>
       </main>
     </div>
     {workflowOpen && <WorkflowOverlay prompt={prompt} stage={stage} pending={workflow.isPending} result={workflow.data?.plan?.summary} onClose={() => !workflow.isPending && setWorkflowOpen(false)} />}
@@ -223,3 +232,15 @@ function ActivityView({ events }: { events: DemoEvent[] }) { return <div><Sectio
 function ToolsView() { const tools = [{ name: "Web search", desc: "Find current, cited information", permission: "Low risk", icon: Search }, { name: "Memory search", desc: "Retrieve relevant personal context", permission: "Private", icon: BrainCircuit }, { name: "Task manager", desc: "Create and update workspace tasks", permission: "Low risk", icon: ListChecks }, { name: "File search", desc: "Ground responses in uploaded files", permission: "Private", icon: FileText }, { name: "Email drafting", desc: "Prepare communication without sending", permission: "Approval required", icon: WandSparkles }, { name: "Calculator", desc: "Perform transparent calculations", permission: "Low risk", icon: Gauge }]; return <div><SectionHeader eyebrow="System / tool registry" title="Tools" detail="Every capability has a scope, permission level, and audit trail." /><div className="grid gap-3 md:grid-cols-2">{tools.map(tool => { const Icon = tool.icon; return <div key={tool.name} className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4"><div className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.05] text-cyan-300"><Icon className="h-4 w-4" /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-slate-200">{tool.name}</h3><p className="mt-1 text-xs text-slate-500">{tool.desc}</p></div><div className="text-right"><span className="block text-[10px] text-lime-300">Enabled</span><span className="mt-1 block text-[10px] text-slate-600">{tool.permission}</span></div></div> })}</div></div>; }
 function SettingsView({ user, onLogout }: { user: string; onLogout: () => void }) { return <div><SectionHeader eyebrow="System / workspace" title="Settings" detail="Control how your AI OS works with you." /><div className="max-w-2xl space-y-4"><div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="flex items-center gap-4"><div className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500 text-sm font-bold text-white">{initials(user)}</div><div><p className="font-semibold text-white">{user}</p><p className="mt-1 text-xs text-slate-500">Private workspace identity</p></div><Pill tone="lime">Protected</Pill></div></div><div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold text-white">Human approval boundary</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">Sensitive actions such as sending email always pause for review.</p></div><span className="rounded-full bg-lime-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-lime-300">On</span></div></div><button onClick={onLogout} className="rounded-xl border border-rose-300/20 bg-rose-300/[0.06] px-4 py-2.5 text-xs font-semibold text-rose-200 hover:bg-rose-300/10">Sign out</button></div></div>; }
 function WorkflowOverlay({ prompt, stage, pending, result, onClose }: { prompt: string; stage: number; pending: boolean; result?: string; onClose: () => void }) { return <div className="fixed inset-0 z-[70] grid place-items-center bg-[#03060b]/80 p-5 backdrop-blur-md"><div className="w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-300/20 bg-[#0b131f] shadow-[0_30px_120px_rgba(0,0,0,0.55)]"><div className="flex items-start justify-between border-b border-white/[0.08] p-6"><div><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-cyan-300/10 text-cyan-300"><WandSparkles className="h-4 w-4" /></span><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Safe execution view</span></div><h2 className="text-xl font-semibold text-white">{pending ? "AI is working..." : "Workflow complete"}</h2><p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">{prompt || "Your new goal"}</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button></div><div className="space-y-3 p-6">{stageLabels.map((label, index) => <div key={label} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition ${index < stage || (!pending && index === stage) ? "border-lime-300/20 bg-lime-300/[0.05]" : index === stage && pending ? "border-cyan-300/20 bg-cyan-300/[0.05]" : "border-white/[0.06] bg-white/[0.02]"}`}><span className={`grid h-6 w-6 place-items-center rounded-full ${index < stage || (!pending && index === stage) ? "bg-lime-300 text-slate-950" : index === stage && pending ? "bg-cyan-300/15 text-cyan-300" : "bg-white/[0.06] text-slate-600"}`}>{index < stage || (!pending && index === stage) ? <Check className="h-3.5 w-3.5" /> : index === stage && pending ? <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" /> : <span className="text-[10px] font-semibold">{index + 1}</span>}</span><span className={`text-sm ${index <= stage ? "text-slate-200" : "text-slate-600"}`}>{label}</span>{index === stage && pending && <span className="ml-auto text-[10px] uppercase tracking-[0.16em] text-cyan-300">In progress</span>}</div>)}{result && <div className="mt-5 rounded-2xl border border-lime-300/20 bg-lime-300/[0.05] p-4"><div className="flex items-center gap-2 text-xs font-semibold text-lime-300"><CheckCircle2 className="h-4 w-4" />Critic approved this plan</div><p className="mt-2 text-xs leading-relaxed text-slate-300">{result}</p></div>}</div><div className="flex items-center justify-between border-t border-white/[0.08] px-6 py-4"><span className="flex items-center gap-2 text-[10px] text-slate-600"><Lock className="h-3 w-3" />No hidden chain-of-thought shown</span><button disabled={pending} onClick={onClose} className="rounded-xl bg-white/[0.08] px-4 py-2 text-xs font-semibold text-slate-200 disabled:opacity-40">{pending ? "Working" : "Close"}</button></div></div></div>; }
+
+function ChatView() {
+  const [draft, setDraft] = useState("");
+  const history = trpc.chat.history.useQuery(undefined, { retry: false });
+  const send = trpc.chat.send.useMutation({ onSuccess: () => { setDraft(""); history.refetch(); } });
+  const items = history.data?.messages ?? [];
+  return <div className="mx-auto max-w-4xl space-y-6"><SectionHeader eyebrow="Communication Agent" title="Private AI chat" detail="Continue work across goals, tasks, memory, and approved workflows." /><div className="min-h-[440px] rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="space-y-4">{items.length === 0 ? <div className="grid min-h-[320px] place-items-center text-center"><div><MessageCircle className="mx-auto h-8 w-8 text-cyan-300/70" /><p className="mt-4 text-sm font-semibold text-slate-200">Start a private conversation</p><p className="mt-2 text-xs text-slate-500">Ask a question or tell your AI OS what to move forward.</p></div></div> : items.map(message => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-white/[0.04] text-slate-200"}`}>{message.content}</div></div>)}</div></div><form onSubmit={event => { event.preventDefault(); if (draft.trim() && !send.isPending) send.mutate({ conversationId: history.data?.conversation?.id, content: draft.trim() }); }} className="flex gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.04] p-3"><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Ask your AI OS anything..." className="min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none placeholder:text-slate-600" /><button disabled={!draft.trim() || send.isPending} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950 disabled:opacity-40"><ArrowUpRight className="h-4 w-4" />{send.isPending ? "Thinking" : "Send"}</button></form></div>;
+}
+
+function AuthPanel({ mode, setMode, name, setName, email, setEmail, password, setPassword, pending, onSubmit }: { mode: "login" | "signup"; setMode: (mode: "login" | "signup") => void; name: string; setName: (value: string) => void; email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void; pending: boolean; onSubmit: () => void }) {
+  return <div className="mb-8 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-5"><div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300">Private workspace</p><h2 className="mt-2 text-xl font-semibold text-white">{mode === "login" ? "Sign in to persist your work" : "Create your private AI OS"}</h2><p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-400">Goals, tasks, conversations, memories, and activity are isolated to your account.</p></div><div className="flex rounded-xl border border-white/10 bg-black/10 p-1 text-xs"><button onClick={() => setMode("login")} className={`rounded-lg px-3 py-2 ${mode === "login" ? "bg-white/10 text-white" : "text-slate-500"}`}>Sign in</button><button onClick={() => setMode("signup")} className={`rounded-lg px-3 py-2 ${mode === "signup" ? "bg-white/10 text-white" : "text-slate-500"}`}>Create account</button></div></div><form onSubmit={event => { event.preventDefault(); onSubmit(); }} className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">{mode === "signup" && <input value={name} onChange={event => setName(event.target.value)} placeholder="Name" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600" />}<input required type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="Email" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600" /><input required type="password" minLength={mode === "signup" ? 10 : 1} value={password} onChange={event => setPassword(event.target.value)} placeholder={mode === "signup" ? "Password (10+ characters)" : "Password"} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600" /><button disabled={pending} className="rounded-xl bg-cyan-300 px-5 py-2.5 text-xs font-bold text-slate-950 disabled:opacity-40">{pending ? "Working..." : mode === "login" ? "Sign in" : "Create account"}</button></form></div>;
+}

@@ -1,0 +1,1 @@
+export default function NotFound() { return <div className="grid min-h-screen place-items-center bg-[#070b12] text-slate-200"><div className="text-center"><p className="text-4xl font-semibold">404</p><p className="mt-2 text-sm text-slate-400">This workspace route does not exist.</p></div></div>; }
