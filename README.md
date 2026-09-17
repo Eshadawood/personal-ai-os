@@ -111,7 +111,7 @@ The managed environment injects the platform credentials. For self-hosted develo
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | MySQL/TiDB connection string |
-| `JWT_SECRET` | Session signing secret |
+| `AUTH_SESSION_SECRET` | Session signing secret for the local password-auth flow |
 | `VITE_APP_ID` | OAuth application identifier |
 | `OAUTH_SERVER_URL` | OAuth service base URL |
 | `VITE_OAUTH_PORTAL_URL` | Frontend login portal URL |
@@ -127,7 +127,7 @@ Never commit `.env` or hard-code secrets.
 | Service | Why it is needed | Environment variable(s) | MVP status |
 | --- | --- | --- | --- |
 | Managed MySQL/TiDB | Persists users, goals, tasks, memory, conversations, and activity | `DATABASE_URL` | **Required now** |
-| Manus OAuth | Login, session identity, and protected user workspace | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `JWT_SECRET` | **Required now** |
+| Manus OAuth | Optional OAuth login path | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `JWT_SECRET` | Optional / not used by the current local password-auth flow |
 | Built-in Forge LLM gateway | Planner/Critic structured workflow generation; credentials remain server-side | `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` | **Required now** for AI runs |
 | S3-compatible managed storage | File bytes and document assets when file upload/RAG is implemented | Managed storage configuration; no app-specific key is currently required | Future file/RAG phase |
 | Web search provider | Research Agent live search and source citations | No variable is wired yet; add a provider-specific server secret when implemented | Future integration |

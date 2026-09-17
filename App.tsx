@@ -11,7 +11,16 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/app" component={Home} />
-      <Route path="/app/:section" component={Home} />
+      <Route path="/app/overview" component={Home} />
+      <Route path="/app/chat" component={Home} />
+      <Route path="/app/goals" component={Home} />
+      <Route path="/app/tasks" component={Home} />
+      <Route path="/app/memory" component={Home} />
+      <Route path="/app/files" component={Home} />
+      <Route path="/app/agents" component={Home} />
+      <Route path="/app/activity" component={Home} />
+      <Route path="/app/tools" component={Home} />
+      <Route path="/app/settings" component={Home} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
