@@ -115,8 +115,8 @@ The managed environment injects the platform credentials. For self-hosted develo
 | `VITE_APP_ID` | OAuth application identifier |
 | `OAUTH_SERVER_URL` | OAuth service base URL |
 | `VITE_OAUTH_PORTAL_URL` | Frontend login portal URL |
-| `BUILT_IN_FORGE_API_URL` | Server-side LLM and platform API base URL |
-| `BUILT_IN_FORGE_API_KEY` | Server-side platform API credential |
+| `GROQ_API_KEY` | Server-side Groq API credential |
+| `GROQ_MODEL` | Optional server-side Groq model override; defaults to `openai/gpt-oss-20b` |
 | `VITE_FRONTEND_FORGE_API_URL` | Frontend-safe platform API base URL |
 | `VITE_FRONTEND_FORGE_API_KEY` | Frontend-safe platform API credential |
 
@@ -128,7 +128,7 @@ Never commit `.env` or hard-code secrets.
 | --- | --- | --- | --- |
 | Managed MySQL/TiDB | Persists users, goals, tasks, memory, conversations, and activity | `DATABASE_URL` | **Required now** |
 | Manus OAuth | Optional OAuth login path | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `JWT_SECRET` | Optional / not used by the current local password-auth flow |
-| Built-in Forge LLM gateway | Planner/Critic structured workflow generation; credentials remain server-side | `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` | **Required now** for AI runs |
+| Groq LLM API | Planner/Critic structured workflow generation and chat; credentials remain server-side | `GROQ_API_KEY`, optional `GROQ_MODEL` | **Required now** for AI runs |
 | S3-compatible managed storage | File bytes and document assets when file upload/RAG is implemented | Managed storage configuration; no app-specific key is currently required | Future file/RAG phase |
 | Web search provider | Research Agent live search and source citations | No variable is wired yet; add a provider-specific server secret when implemented | Future integration |
 | Embeddings provider | Semantic memory and document retrieval | No variable is wired yet; use a server-side provider key when implemented | Future integration |
@@ -138,7 +138,7 @@ Never commit `.env` or hard-code secrets.
 | Google Calendar | Calendar-aware planning and schedule retrieval | No variable is wired yet; add OAuth client credentials only with the integration | Future integration |
 | Google Maps | Optional map component shipped by the template | `VITE_FRONTEND_FORGE_API_URL`, `VITE_FRONTEND_FORGE_API_KEY` | Not used by current MVP |
 
-There is no direct `OPENAI_API_KEY` requirement in the current deployment: the server calls the managed LLM gateway through `BUILT_IN_FORGE_API_URL` and `BUILT_IN_FORGE_API_KEY`. No web-search, embedding, MongoDB, email, Calendar, or Chroma credentials should be added until those integrations are actually implemented.
+The current deployment uses Groq's OpenAI-compatible chat completions API. `GROQ_API_KEY` is server-only and `GROQ_MODEL` defaults to `openai/gpt-oss-20b`, which supports the strict JSON Schema responses used by the Planner/Critic workflow. No web-search, embedding, MongoDB, email, Calendar, or Chroma credentials should be added until those integrations are actually implemented.
 
 ## API contracts
 
