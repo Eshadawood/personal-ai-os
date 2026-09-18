@@ -125,6 +125,8 @@ The managed environment injects the platform credentials. For self-hosted develo
 
 Never commit `.env` or hard-code secrets.
 
+For the production Google OAuth client, the redirect URI must exactly match `https://personal-ai-os-kohl.vercel.app/api/oauth/callback`.
+
 ### External service matrix
 
 | Service | Why it is needed | Environment variable(s) | MVP status |
