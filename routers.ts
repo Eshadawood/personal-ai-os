@@ -10,7 +10,7 @@ import { hashPassword, hashSessionToken, newSessionToken, verifyPassword } from 
 import { parse } from "cookie";
 import { users } from "./drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
+import { clearSessionCookie, setSessionCookie } from "./_core/cookies";
 
 const prioritySchema = z.enum(["low", "medium", "high"]);
 
@@ -76,7 +76,7 @@ function requirePositiveInteger(value: number, entity: string) {
 async function establishPasswordSession(ctx: { req: any; res: any }, userId: number) {
   const token = newSessionToken();
   await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1000 * 60 * 60 * 24 * 30));
-  ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
+  setSessionCookie(ctx.res, ctx.req, COOKIE_NAME, token, 1000 * 60 * 60 * 24 * 30);
 }
 
 function safeAuthError(error: unknown, message: string): never {
@@ -138,8 +138,7 @@ export const appRouter = router({
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const token = parse(ctx.req.headers?.cookie ?? "")[COOKIE_NAME];
       await revokeSession(token ?? "");
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      clearSessionCookie(ctx.res, ctx.req, COOKIE_NAME);
       return { success: true } as const;
     }),
   }),

@@ -389,6 +389,40 @@ async function getDb() {
   }
   return _db;
 }
+async function upsertUser(user) {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const db = await getDb();
+  if (!db) return;
+  const values = { openId: user.openId };
+  const updateSet = {};
+  const textFields = ["name", "email", "loginMethod"];
+  for (const field of textFields) {
+    if (user[field] !== void 0) {
+      values[field] = user[field] ?? null;
+      updateSet[field] = user[field] ?? null;
+    }
+  }
+  if (user.lastSignedIn !== void 0) {
+    values.lastSignedIn = user.lastSignedIn;
+    updateSet.lastSignedIn = user.lastSignedIn;
+  }
+  if (user.role !== void 0) {
+    values.role = user.role;
+    updateSet.role = user.role;
+  } else if (user.openId === ENV.ownerOpenId) {
+    values.role = "admin";
+    updateSet.role = "admin";
+  }
+  values.lastSignedIn ??= /* @__PURE__ */ new Date();
+  updateSet.lastSignedIn ??= /* @__PURE__ */ new Date();
+  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+}
+async function getUserByOpenId(openId) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return result[0];
+}
 async function getUserByEmail(email) {
   const db = await getDb();
   if (!db) return void 0;
@@ -438,8 +472,15 @@ async function updateGoalProgress(userId, goalId) {
 import { parse } from "cookie";
 
 // _core/cookies.ts
+import { serialize } from "cookie";
 function getSessionCookieOptions(_req) {
   return { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" };
+}
+function setSessionCookie(res, req, name, value, maxAgeMs) {
+  res.append("Set-Cookie", serialize(name, value, { ...getSessionCookieOptions(req), maxAge: Math.floor(maxAgeMs / 1e3) }));
+}
+function clearSessionCookie(res, req, name) {
+  res.append("Set-Cookie", serialize(name, "", { ...getSessionCookieOptions(req), maxAge: 0 }));
 }
 
 // routers.ts
@@ -494,7 +535,7 @@ function requirePositiveInteger(value, entity) {
 async function establishPasswordSession(ctx, userId) {
   const token = newSessionToken();
   await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30));
-  ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1e3 * 60 * 60 * 24 * 30 });
+  setSessionCookie(ctx.res, ctx.req, COOKIE_NAME, token, 1e3 * 60 * 60 * 24 * 30);
 }
 function safeAuthError(error, message) {
   if (error instanceof TRPCError2) throw error;
@@ -552,8 +593,7 @@ var appRouter = router({
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const token = parse(ctx.req.headers?.cookie ?? "")[COOKIE_NAME];
       await revokeSession(token ?? "");
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      clearSessionCookie(ctx.res, ctx.req, COOKIE_NAME);
       return { success: true };
     })
   }),
@@ -734,10 +774,122 @@ async function createContext(opts) {
   return { ...opts, user };
 }
 
+// server/oauth.ts
+import { randomBytes as randomBytes2, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { parse as parse3, serialize as serialize2 } from "cookie";
+var STATE_COOKIE = "__Host-google-oauth-state";
+var STATE_TTL_SECONDS = 600;
+var SESSION_TTL_MS = 1e3 * 60 * 60 * 24 * 30;
+function googleConfig() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  return clientId && clientSecret && redirectUri ? { clientId, clientSecret, redirectUri } : null;
+}
+function stateCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: STATE_TTL_SECONDS
+  };
+}
+function clearStateCookie(res) {
+  res.append("Set-Cookie", serialize2(STATE_COOKIE, "", { ...stateCookieOptions(), maxAge: 0 }));
+}
+function sameSecret(left, right) {
+  if (!left || !right) return false;
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual2(a, b);
+}
+function registerGoogleOAuthRoutes(app2) {
+  app2.get("/api/oauth/login", (_req, res) => {
+    const config = googleConfig();
+    if (!config) {
+      res.status(503).json({
+        error: "Google OAuth is not configured.",
+        required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI"]
+      });
+      return;
+    }
+    const state = randomBytes2(32).toString("base64url");
+    res.append("Set-Cookie", serialize2(STATE_COOKIE, state, stateCookieOptions()));
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      access_type: "offline",
+      prompt: "select_account"
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  });
+  app2.get("/api/oauth/callback", async (req, res) => {
+    const config = googleConfig();
+    const suppliedState = typeof req.query.state === "string" ? req.query.state : void 0;
+    const expectedState = parse3(req.headers.cookie ?? "")[STATE_COOKIE];
+    clearStateCookie(res);
+    if (!config) {
+      res.status(503).json({ error: "Google OAuth is not configured." });
+      return;
+    }
+    if (!sameSecret(suppliedState, expectedState)) {
+      res.status(403).json({ error: "Invalid OAuth state." });
+      return;
+    }
+    if (typeof req.query.error === "string") {
+      res.status(400).json({ error: "Google OAuth was cancelled or denied." });
+      return;
+    }
+    const code = typeof req.query.code === "string" ? req.query.code : void 0;
+    if (!code) {
+      res.status(400).json({ error: "Google OAuth did not return an authorization code." });
+      return;
+    }
+    try {
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          redirect_uri: config.redirectUri,
+          grant_type: "authorization_code"
+        })
+      });
+      if (!tokenResponse.ok) throw new Error("Google token exchange failed.");
+      const token = await tokenResponse.json();
+      if (!token.access_token) throw new Error("Google did not return an access token.");
+      const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+        headers: { authorization: `Bearer ${token.access_token}` }
+      });
+      if (!profileResponse.ok) throw new Error("Google identity verification failed.");
+      const profile = await profileResponse.json();
+      if (!profile.sub || !profile.email || profile.email_verified !== true) throw new Error("Google account email is not verified.");
+      const openId = `google:${profile.sub}`;
+      await upsertUser({ openId, email: profile.email.toLowerCase(), name: profile.name ?? profile.email, loginMethod: "google", lastSignedIn: /* @__PURE__ */ new Date() });
+      const user = await getUserByOpenId(openId);
+      if (!user) throw new Error("Google account could not be persisted.");
+      const sessionToken = newSessionToken();
+      await createSession(user.id, hashSessionToken(sessionToken), new Date(Date.now() + SESSION_TTL_MS));
+      setSessionCookie(res, req, COOKIE_NAME, sessionToken, SESSION_TTL_MS);
+      res.redirect("/app");
+    } catch (error) {
+      console.error("[auth] Google OAuth failed", error);
+      res.status(502).json({ error: "Google sign-in could not be completed." });
+    }
+  });
+}
+
 // server/app.ts
 var app = express();
 app.use(express.json({ limit: "10mb" }));
 app.get("/api/health", (_req, res) => res.json({ status: "ok", product: "Personal AI OS" }));
+registerGoogleOAuthRoutes(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 var app_default = app;
 

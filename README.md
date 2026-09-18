@@ -115,6 +115,9 @@ The managed environment injects the platform credentials. For self-hosted develo
 | `VITE_APP_ID` | OAuth application identifier |
 | `OAUTH_SERVER_URL` | OAuth service base URL |
 | `VITE_OAUTH_PORTAL_URL` | Frontend login portal URL |
+| `GOOGLE_CLIENT_ID` | Google OAuth web application client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth web application client secret; server-only |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Exact registered callback URL, for example `https://personal-ai-os-kohl.vercel.app/api/oauth/callback` |
 | `GROQ_API_KEY` | Server-side Groq API credential |
 | `GROQ_MODEL` | Optional server-side Groq model override; defaults to `openai/gpt-oss-20b` |
 | `VITE_FRONTEND_FORGE_API_URL` | Frontend-safe platform API base URL |
@@ -127,7 +130,8 @@ Never commit `.env` or hard-code secrets.
 | Service | Why it is needed | Environment variable(s) | MVP status |
 | --- | --- | --- | --- |
 | Managed MySQL/TiDB | Persists users, goals, tasks, memory, conversations, and activity | `DATABASE_URL` | **Required now** |
-| Manus OAuth | Optional OAuth login path | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `JWT_SECRET` | Optional / not used by the current local password-auth flow |
+| Google OAuth | Optional Google sign-in and session creation | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` | Ready; enable by configuring credentials |
+| Manus OAuth | Optional OAuth login path | `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `JWT_SECRET` | Optional / preserved for existing managed portal configuration |
 | Groq LLM API | Planner/Critic structured workflow generation and chat; credentials remain server-side | `GROQ_API_KEY`, optional `GROQ_MODEL` | **Required now** for AI runs |
 | S3-compatible managed storage | File bytes and document assets when file upload/RAG is implemented | Managed storage configuration; no app-specific key is currently required | Future file/RAG phase |
 | Web search provider | Research Agent live search and source citations | No variable is wired yet; add a provider-specific server secret when implemented | Future integration |
