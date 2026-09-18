@@ -7,7 +7,7 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is required to run migrations.");
 
 const parsed = new URL(url);
-const tlsEnabled = process.env.NODE_ENV === "production" || process.env.DATABASE_SSL === "true";
+const tlsEnabled = process.env.VERCEL === "1" || process.env.NODE_ENV === "production" || process.env.DATABASE_SSL === "true";
 const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
 const connection = await mysql.createConnection({
   host: parsed.hostname,
