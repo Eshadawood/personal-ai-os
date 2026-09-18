@@ -223,6 +223,15 @@ var fetchWithBackoff = async (url, init) => {
   }
   throw lastError instanceof Error ? lastError : new Error("LLM request failed after exhausting retries");
 };
+async function parseJsonResponse(response, fallbackMessage) {
+  const body = await response.text();
+  if (!body) throw new Error(fallbackMessage);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+}
 async function invokeLLM(params) {
   assertApiKey();
   const {
@@ -287,7 +296,7 @@ async function invokeLLM(params) {
       `LLM invoke failed: ${response.status} ${response.statusText} \u2013 ${errorText}`
     );
   }
-  return await response.json();
+  return parseJsonResponse(response, "The AI service returned an invalid response.");
 }
 
 // shared/const.ts
@@ -363,9 +372,16 @@ function hashSessionToken(token) {
 // db.ts
 var _db = null;
 async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && ENV.databaseUrl) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const tlsEnabled = ENV.isProduction || process.env.DATABASE_SSL === "true";
+      const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
+      _db = drizzle({
+        connection: {
+          uri: ENV.databaseUrl,
+          ...tlsEnabled ? { ssl: { rejectUnauthorized } } : {}
+        }
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

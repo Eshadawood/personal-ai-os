@@ -17,9 +17,19 @@ import { hashSessionToken } from "./auth";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && ENV.databaseUrl) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // Hosted MySQL providers such as TiDB Cloud reject plaintext clients.
+      // Keep local development unchanged, but use certificate-verified TLS in
+      // production. DATABASE_SSL can opt into TLS for hosted non-production.
+      const tlsEnabled = ENV.isProduction || process.env.DATABASE_SSL === "true";
+      const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
+      _db = drizzle({
+        connection: {
+          uri: ENV.databaseUrl,
+          ...(tlsEnabled ? { ssl: { rejectUnauthorized } } : {}),
+        },
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

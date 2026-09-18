@@ -11,7 +11,7 @@ import LoginPage from "./LoginPage";
 function AuthGate() {
   const { user, loading } = useAuth();
   const [location] = useLocation();
-  const publicRoute = location === "/login" || location === "/signup";
+  const publicRoute = location === "/login";
 
   if (loading) {
     return <div className="grid min-h-screen place-items-center bg-[#070b12] text-sm text-slate-400"><span className="mr-2 h-2 w-2 animate-pulse rounded-full bg-cyan-300" />Checking your session…</div>;
@@ -21,7 +21,7 @@ function AuthGate() {
 
   return <Switch>
     <Route path="/login"><LoginPage initialMode="login" /></Route>
-    <Route path="/signup"><LoginPage initialMode="signup" /></Route>
+    <Route path="/signup"><Redirect to="/login" /></Route>
     <Route path="/"><Redirect to="/app" /></Route>
     <Route path="/app" component={Home} />
     <Route path="/app/overview" component={Home} />

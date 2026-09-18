@@ -338,6 +338,16 @@ const fetchWithBackoff = async (
     : new Error("LLM request failed after exhausting retries");
 };
 
+async function parseJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const body = await response.text();
+  if (!body) throw new Error(fallbackMessage);
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
@@ -414,7 +424,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  return parseJsonResponse<InvokeResult>(response, "The AI service returned an invalid response.");
 }
 
 export type ModelInfo = {
@@ -445,5 +455,5 @@ export async function listLLMModels(): Promise<ModelsResponse> {
     );
   }
 
-  return (await response.json()) as ModelsResponse;
+  return parseJsonResponse<ModelsResponse>(response, "The AI service returned an invalid model list.");
 }
