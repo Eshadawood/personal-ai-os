@@ -73,6 +73,18 @@ function requirePositiveInteger(value: number, entity: string) {
   return value;
 }
 
+async function establishPasswordSession(ctx: { req: any; res: any }, userId: number) {
+  const token = newSessionToken();
+  await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1000 * 60 * 60 * 24 * 30));
+  ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
+}
+
+function safeAuthError(error: unknown, message: string): never {
+  if (error instanceof TRPCError) throw error;
+  console.error("[auth] password session failed", error);
+  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+}
+
 async function generatePlan(prompt: string): Promise<Plan> {
   const response = await invokeLLM({
     messages: [
@@ -97,27 +109,31 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     signup: publicProcedure.input(z.object({ name: z.string().trim().min(2).max(120), email: z.string().email().max(320), password: z.string().min(10).max(200) })).mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
-      const email = input.email.toLowerCase();
-      if (await getUserByEmail(email)) throw new TRPCError({ code: "CONFLICT", message: "An account with that email already exists." });
-      const result = await db.insert(users).values({ openId: `local:${email}`, name: input.name, email, passwordHash: await hashPassword(input.password), loginMethod: "password" }).$returningId();
-      const userId = requireInsertedId(result, "User");
-      const token = newSessionToken();
-      await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1000 * 60 * 60 * 24 * 30));
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
-      return { success: true } as const;
+      try {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+        const email = input.email.toLowerCase();
+        if (await getUserByEmail(email)) throw new TRPCError({ code: "CONFLICT", message: "An account with that email already exists." });
+        const result = await db.insert(users).values({ openId: `local:${email}`, name: input.name, email, passwordHash: await hashPassword(input.password), loginMethod: "password" }).$returningId();
+        const userId = requireInsertedId(result, "User");
+        await establishPasswordSession(ctx, userId);
+        return { success: true } as const;
+      } catch (error) {
+        return safeAuthError(error, "We couldn't create your account right now. Please try again shortly.");
+      }
     }),
     login: publicProcedure.input(z.object({ email: z.string().email().max(320), password: z.string().min(1).max(200) })).mutation(async ({ ctx, input }) => {
-      const user = await getUserByEmail(input.email.toLowerCase());
-      if (!user?.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
-      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-      const token = newSessionToken();
-      await createSession(user.id, hashSessionToken(token), new Date(Date.now() + 1000 * 60 * 60 * 24 * 30));
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
-      return { success: true } as const;
+      try {
+        const user = await getUserByEmail(input.email.toLowerCase());
+        if (!user?.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+        await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+        await establishPasswordSession(ctx, user.id);
+        return { success: true } as const;
+      } catch (error) {
+        return safeAuthError(error, "We couldn't sign you in right now. Please try again shortly.");
+      }
     }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const token = parse(ctx.req.headers?.cookie ?? "")[COOKIE_NAME];

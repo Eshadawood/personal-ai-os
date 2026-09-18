@@ -195,7 +195,7 @@ export default function Home() {
     if (page === "agents") return <AgentsView />;
     if (page === "activity") return <ActivityView events={liveEvents} />;
     if (page === "tools") return <ToolsView />;
-    if (page === "settings") return <SettingsView user={user?.name || "Alex Morgan"} onLogout={logout} />;
+    if (page === "settings") return <SettingsView user={user?.name || "Alex Morgan"} onLogout={() => { void logout().finally(() => setLocation("/login")); }} />;
     return <OverviewView firstName={firstName} prompt={prompt} setPrompt={setPrompt} submitPrompt={submitPrompt} goals={liveGoals} tasks={liveTasks} events={liveEvents} activeGoal={activeGoal} completedTasks={completedTasks} onToggle={toggleLocalTask} onNavigate={navigate} />;
   }, [page, prompt, liveGoals, liveTasks, liveEvents, activeGoal, completedTasks, isAuthenticated, user?.name, workflowPrompt]);
 
