@@ -1,5 +1,5 @@
 {
-  "buildCommand": "vite build",
+  "buildCommand": "pnpm db:migrate && vite build",
   "outputDirectory": "dist",
   "rewrites": [
     {
