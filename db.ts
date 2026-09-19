@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activityEvents,
@@ -36,6 +36,18 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+export async function getDatabaseHealth(): Promise<"connected" | "not_configured" | "unavailable"> {
+  const db = await getDb();
+  if (!db) return "not_configured";
+  try {
+    await db.execute(sql`SELECT 1`);
+    return "connected";
+  } catch (error) {
+    console.error("[Database] Health check failed", error);
+    return "unavailable";
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

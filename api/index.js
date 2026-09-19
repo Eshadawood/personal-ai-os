@@ -341,7 +341,7 @@ var adminProcedure = t.procedure.use(
 );
 
 // db.ts
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // auth.ts
@@ -388,6 +388,17 @@ async function getDb() {
     }
   }
   return _db;
+}
+async function getDatabaseHealth() {
+  const db = await getDb();
+  if (!db) return "not_configured";
+  try {
+    await db.execute(sql`SELECT 1`);
+    return "connected";
+  } catch (error) {
+    console.error("[Database] Health check failed", error);
+    return "unavailable";
+  }
 }
 async function upsertUser(user) {
   if (!user.openId) throw new Error("User openId is required for upsert");
@@ -532,6 +543,10 @@ function requirePositiveInteger(value, entity) {
   }
   return value;
 }
+function isDatabaseError(error) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("drizzlequeryerror") || message.includes("table '") || message.includes("mysql") || message.includes("database");
+}
 async function establishPasswordSession(ctx, userId) {
   const token = newSessionToken();
   await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30));
@@ -540,7 +555,10 @@ async function establishPasswordSession(ctx, userId) {
 function safeAuthError(error, message) {
   if (error instanceof TRPCError2) throw error;
   console.error("[auth] password session failed", error);
-  throw new TRPCError2({ code: "INTERNAL_SERVER_ERROR", message });
+  throw new TRPCError2({
+    code: isDatabaseError(error) ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+    message: isDatabaseError(error) ? "Account services are temporarily unavailable." : message
+  });
 }
 async function generatePlan(prompt) {
   const response = await invokeLLM({
@@ -888,13 +906,18 @@ function registerGoogleOAuthRoutes(app2) {
 // server/app.ts
 var app = express();
 app.use(express.json({ limit: "10mb" }));
-app.get("/api/health", (_req, res) => res.json({ status: "ok", product: "Personal AI OS" }));
+app.get("/api/health", async (_req, res) => {
+  const database = await getDatabaseHealth();
+  res.status(database === "connected" ? 200 : 503).json({
+    status: database === "connected" ? "ok" : "degraded",
+    product: "Personal AI OS",
+    database
+  });
+});
 registerGoogleOAuthRoutes(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 var app_default = app;
-
-// api/index.ts
-var index_default = app_default;
 export {
-  index_default as default
+  app,
+  app_default as default
 };

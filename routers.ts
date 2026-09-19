@@ -73,6 +73,11 @@ function requirePositiveInteger(value: number, entity: string) {
   return value;
 }
 
+function isDatabaseError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("drizzlequeryerror") || message.includes("table '") || message.includes("mysql") || message.includes("database");
+}
+
 async function establishPasswordSession(ctx: { req: any; res: any }, userId: number) {
   const token = newSessionToken();
   await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1000 * 60 * 60 * 24 * 30));
@@ -82,7 +87,10 @@ async function establishPasswordSession(ctx: { req: any; res: any }, userId: num
 function safeAuthError(error: unknown, message: string): never {
   if (error instanceof TRPCError) throw error;
   console.error("[auth] password session failed", error);
-  throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+  throw new TRPCError({
+    code: isDatabaseError(error) ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+    message: isDatabaseError(error) ? "Account services are temporarily unavailable." : message,
+  });
 }
 
 async function generatePlan(prompt: string): Promise<Plan> {
