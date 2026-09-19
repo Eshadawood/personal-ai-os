@@ -1,5 +1,5 @@
 {
-  "buildCommand": "vite build",
+  "buildCommand": "NODE_ENV=production DATABASE_SSL=true pnpm db:migrate && vite build",
   "outputDirectory": "dist",
   "rewrites": [
     {
