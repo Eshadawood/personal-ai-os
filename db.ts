@@ -16,6 +16,37 @@ import { hashSessionToken } from "./auth";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+const TRANSIENT_DATABASE_ERRORS = new Set([
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+  "PROTOCOL_CONNECTION_LOST",
+  "PROTOCOL_SEQUENCE_TIMEOUT",
+  "ER_CON_COUNT_ERROR",
+]);
+
+function isTransientDatabaseError(error: unknown) {
+  const code = (error as { code?: string })?.code;
+  return typeof code === "string" && TRANSIENT_DATABASE_ERRORS.has(code);
+}
+
+async function withDatabaseRetry<T>(operation: () => Promise<T>, label: string): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientDatabaseError(error) || attempt === 2) throw error;
+      const delayMs = 250 * (attempt + 1);
+      console.warn(`[Database] Transient ${label} failure; retrying in ${delayMs}ms`, error);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
 export async function getDb() {
   if (!_db && ENV.databaseUrl) {
     try {
@@ -27,6 +58,12 @@ export async function getDb() {
       _db = drizzle({
         connection: {
           uri: ENV.databaseUrl,
+          connectTimeout: 30_000,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 0,
+          waitForConnections: true,
+          connectionLimit: 2,
+          maxIdle: 2,
           ...(tlsEnabled ? { ssl: { rejectUnauthorized } } : {}),
         },
       });
@@ -77,13 +114,19 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
   values.lastSignedIn ??= new Date();
   updateSet.lastSignedIn ??= new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await withDatabaseRetry(
+    () => db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet }),
+    "user upsert",
+  );
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await withDatabaseRetry(
+    () => db.select().from(users).where(eq(users.openId, openId)).limit(1),
+    "user lookup",
+  );
   return result[0];
 }
 
@@ -103,7 +146,10 @@ export async function getUserBySessionToken(token: string) {
 export async function createSession(userId: number, tokenHash: string, expiresAt: Date) {
   const db = await getDb();
   if (!db) throw new Error("Database is not configured.");
-  await db.insert(sessions).values({ userId, tokenHash, expiresAt });
+  await withDatabaseRetry(
+    () => db.insert(sessions).values({ userId, tokenHash, expiresAt }).onDuplicateKeyUpdate({ set: { tokenHash } }),
+    "session insert",
+  );
 }
 
 export async function revokeSession(token: string) {

@@ -371,6 +371,34 @@ function hashSessionToken(token) {
 
 // db.ts
 var _db = null;
+var TRANSIENT_DATABASE_ERRORS = /* @__PURE__ */ new Set([
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+  "PROTOCOL_CONNECTION_LOST",
+  "PROTOCOL_SEQUENCE_TIMEOUT",
+  "ER_CON_COUNT_ERROR"
+]);
+function isTransientDatabaseError(error) {
+  const code = error?.code;
+  return typeof code === "string" && TRANSIENT_DATABASE_ERRORS.has(code);
+}
+async function withDatabaseRetry(operation, label) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientDatabaseError(error) || attempt === 2) throw error;
+      const delayMs = 250 * (attempt + 1);
+      console.warn(`[Database] Transient ${label} failure; retrying in ${delayMs}ms`, error);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
 async function getDb() {
   if (!_db && ENV.databaseUrl) {
     try {
@@ -379,6 +407,12 @@ async function getDb() {
       _db = drizzle({
         connection: {
           uri: ENV.databaseUrl,
+          connectTimeout: 3e4,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 0,
+          waitForConnections: true,
+          connectionLimit: 2,
+          maxIdle: 2,
           ...tlsEnabled ? { ssl: { rejectUnauthorized } } : {}
         }
       });
@@ -426,12 +460,18 @@ async function upsertUser(user) {
   }
   values.lastSignedIn ??= /* @__PURE__ */ new Date();
   updateSet.lastSignedIn ??= /* @__PURE__ */ new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await withDatabaseRetry(
+    () => db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet }),
+    "user upsert"
+  );
 }
 async function getUserByOpenId(openId) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await withDatabaseRetry(
+    () => db.select().from(users).where(eq(users.openId, openId)).limit(1),
+    "user lookup"
+  );
   return result[0];
 }
 async function getUserByEmail(email) {
@@ -448,7 +488,10 @@ async function getUserBySessionToken(token) {
 async function createSession(userId, tokenHash, expiresAt) {
   const db = await getDb();
   if (!db) throw new Error("Database is not configured.");
-  await db.insert(sessions).values({ userId, tokenHash, expiresAt });
+  await withDatabaseRetry(
+    () => db.insert(sessions).values({ userId, tokenHash, expiresAt }).onDuplicateKeyUpdate({ set: { tokenHash } }),
+    "session insert"
+  );
 }
 async function revokeSession(token) {
   const db = await getDb();
