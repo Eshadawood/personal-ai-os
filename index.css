@@ -70,6 +70,18 @@ button:disabled { cursor: not-allowed; }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
+  .field { width: 100%; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; background: rgba(0,0,0,0.2); padding: 0.7rem 0.8rem; color: #f1f5f9; outline: none; }
+  .field:focus { border-color: rgba(103,232,249,0.45); }
+  .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin: 1rem 0 0.45rem; color: #fff; font-weight: 700; line-height: 1.25; }
+  .markdown-content h1 { font-size: 1.35rem; } .markdown-content h2 { font-size: 1.15rem; } .markdown-content h3 { font-size: 1rem; }
+  .markdown-content p { margin: 0.55rem 0; } .markdown-content ul, .markdown-content ol { margin: 0.65rem 0; padding-left: 1.4rem; }
+  .markdown-content ul { list-style: disc; } .markdown-content ol { list-style: decimal; }
+  .markdown-content li { margin: 0.25rem 0; } .markdown-content strong { color: #fff; font-weight: 700; }
+  .markdown-content code { border-radius: 0.35rem; background: rgba(255,255,255,0.08); padding: 0.12rem 0.3rem; font-family: 'DM Mono', monospace; font-size: 0.85em; }
+  .markdown-content pre { margin: 0.8rem 0; overflow-x: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; background: #070b12; padding: 0.8rem; }
+  .markdown-content pre code { background: transparent; padding: 0; } .markdown-content table { width: 100%; margin: 0.8rem 0; border-collapse: collapse; font-size: 0.85em; }
+  .markdown-content th, .markdown-content td { border: 1px solid rgba(255,255,255,0.12); padding: 0.45rem 0.6rem; text-align: left; }
+  .markdown-content th { background: rgba(255,255,255,0.06); color: #fff; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

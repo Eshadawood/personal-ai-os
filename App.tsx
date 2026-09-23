@@ -28,6 +28,7 @@ function AuthGate() {
     <Route path="/app/chat" component={Home} />
     <Route path="/app/goals" component={Home} />
     <Route path="/app/tasks" component={Home} />
+    <Route path="/app/history" component={Home} />
     <Route path="/app/memory" component={Home} />
     <Route path="/app/files" component={Home} />
     <Route path="/app/agents" component={Home} />
