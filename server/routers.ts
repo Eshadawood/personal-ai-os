@@ -772,25 +772,35 @@ export const appRouter = router({
               .map((memory) => "- [" + memory.category + "] " + memory.content)
               .join("\n")
           : "";
+        const isMemoryRecall =
+          !explicitMemory &&
+          relevantMemories.length > 0 &&
+          /\b(what|which|do you remember|remember)\b/i.test(input.content);
         let answer = explicitMemory
           ? "I’ll remember that: " + explicitMemory
-          : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
-        try {
-          const response = await invokeLLM({
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are the Personal AI OS assistant. Give concise, actionable answers. Use Markdown for structure (headings, lists, tables, and code when useful). Never claim to have taken sensitive external actions without approval." +
-                  memoryContext,
-              },
-              { role: "user", content: input.content },
-            ],
-            maxTokens: 700,
-          });
-          answer = readLLMText(response.choices[0]?.message?.content) || answer;
-        } catch (error) {
-          console.warn("[chat] AI response unavailable", error);
+          : isMemoryRecall
+            ? "I remember: " +
+              relevantMemories.map((memory) => memory.content).join("; ")
+            : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
+        if (!isMemoryRecall) {
+          try {
+            const response = await invokeLLM({
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are the Personal AI OS assistant. Give concise, actionable answers. Use Markdown for structure (headings, lists, tables, and code when useful). Never claim to have taken sensitive external actions without approval." +
+                    memoryContext,
+                },
+                { role: "user", content: input.content },
+              ],
+              maxTokens: 700,
+            });
+            answer =
+              readLLMText(response.choices[0]?.message?.content) || answer;
+          } catch (error) {
+            console.warn("[chat] AI response unavailable", error);
+          }
         }
         await db.insert(messages).values({
           conversationId,
