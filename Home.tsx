@@ -4,73 +4,1472 @@ import { Streamdown } from "streamdown";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Activity, ArrowUpRight, Bot, BrainCircuit, Check, ChevronRight, Circle, Clock3, FileText, FolderKanban, LayoutDashboard, ListChecks, Lock, Menu, MessageCircle, MoreHorizontal, Network, Plus, Search, Settings2, Sparkles, Target, TerminalSquare, X } from "lucide-react";
+import {
+  Activity,
+  ArrowUpRight,
+  Bot,
+  BrainCircuit,
+  Check,
+  ChevronRight,
+  Circle,
+  Clock3,
+  FileText,
+  FolderKanban,
+  LayoutDashboard,
+  ListChecks,
+  Lock,
+  Menu,
+  MessageCircle,
+  MoreHorizontal,
+  Network,
+  Plus,
+  Search,
+  Settings2,
+  Sparkles,
+  Target,
+  TerminalSquare,
+  X,
+} from "lucide-react";
 
-type PageKey = "overview" | "chat" | "goals" | "tasks" | "memory" | "history" | "files" | "agents" | "activity" | "tools" | "settings";
-type Goal = { id: number; title: string; description: string | null; status: "active" | "completed" | "paused"; priority: "low" | "medium" | "high"; progress: number };
-type Task = { id: number; title: string; description: string | null; status: "todo" | "in_progress" | "completed" | "failed"; priority: "low" | "medium" | "high"; agent: string; goalId?: number | null };
-type Event = { id: number; title: string; description: string | null; eventType: string; agent: string | null; createdAt: Date | string };
+type PageKey =
+  | "overview"
+  | "chat"
+  | "goals"
+  | "tasks"
+  | "memory"
+  | "history"
+  | "files"
+  | "agents"
+  | "activity"
+  | "tools"
+  | "settings";
+type Goal = {
+  id: number;
+  title: string;
+  description: string | null;
+  status: "active" | "completed" | "paused";
+  priority: "low" | "medium" | "high";
+  progress: number;
+};
+type Task = {
+  id: number;
+  title: string;
+  description: string | null;
+  status: "todo" | "in_progress" | "completed" | "failed";
+  priority: "low" | "medium" | "high";
+  agent: string;
+  goalId?: number | null;
+};
+type Event = {
+  id: number;
+  title: string;
+  description: string | null;
+  eventType: string;
+  agent: string | null;
+  createdAt: Date | string;
+};
 
 const navGroups = [
-  { label: "Workspace", items: [["overview", "Overview", LayoutDashboard], ["chat", "Chat", MessageCircle], ["goals", "Goals", Target], ["tasks", "Tasks", ListChecks], ["history", "History", Clock3]] },
-  { label: "Context", items: [["memory", "Memory", BrainCircuit], ["files", "Files", FileText]] },
-  { label: "System", items: [["agents", "Agents", Network], ["activity", "Activity", Activity], ["tools", "Tools", TerminalSquare]] },
+  {
+    label: "Workspace",
+    items: [
+      ["overview", "Overview", LayoutDashboard],
+      ["chat", "Chat", MessageCircle],
+      ["goals", "Goals", Target],
+      ["tasks", "Tasks", ListChecks],
+      ["history", "History", Clock3],
+    ],
+  },
+  {
+    label: "Context",
+    items: [
+      ["memory", "Memory", BrainCircuit],
+      ["files", "Files", FileText],
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      ["agents", "Agents", Network],
+      ["activity", "Activity", Activity],
+      ["tools", "Tools", TerminalSquare],
+    ],
+  },
 ] as const;
 
-function formatRelative(value: Date | string) { const mins = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60000)); return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`; }
-function initials(name?: string | null) { return (name || "Workspace").split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase(); }
-function Pill({ children, tone = "slate" }: { children: ReactNode; tone?: "lime" | "blue" | "amber" | "slate" | "pink" }) { const styles = { lime: "bg-lime-400/10 text-lime-300 border-lime-400/20", blue: "bg-cyan-400/10 text-cyan-300 border-cyan-400/20", amber: "bg-amber-300/10 text-amber-200 border-amber-300/20", slate: "bg-white/[0.06] text-slate-300 border-white/10", pink: "bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-400/20" }; return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] ${styles[tone]}`}>{children}</span>; }
-function SectionHeader({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail?: string; action?: ReactNode }) { return <div className="mb-6 flex items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">{eyebrow}</p><h2 className="text-xl font-semibold tracking-tight text-white">{title}</h2>{detail && <p className="mt-1 text-sm text-slate-400">{detail}</p>}</div>{action}</div>; }
+function formatRelative(value: Date | string) {
+  const mins = Math.max(
+    1,
+    Math.round((Date.now() - new Date(value).getTime()) / 60000),
+  );
+  return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+}
+function initials(name?: string | null) {
+  return (name || "Workspace")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+function Pill({
+  children,
+  tone = "slate",
+}: {
+  children: ReactNode;
+  tone?: "lime" | "blue" | "amber" | "slate" | "pink";
+}) {
+  const styles = {
+    lime: "bg-lime-400/10 text-lime-300 border-lime-400/20",
+    blue: "bg-cyan-400/10 text-cyan-300 border-cyan-400/20",
+    amber: "bg-amber-300/10 text-amber-200 border-amber-300/20",
+    slate: "bg-white/[0.06] text-slate-300 border-white/10",
+    pink: "bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-400/20",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] ${styles[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+function SectionHeader({
+  eyebrow,
+  title,
+  detail,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  detail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex items-end justify-between gap-4">
+      <div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+          {eyebrow}
+        </p>
+        <h2 className="text-xl font-semibold tracking-tight text-white">
+          {title}
+        </h2>
+        {detail && <p className="mt-1 text-sm text-slate-400">{detail}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export default function Home() {
-  const { user, loading: authLoading, isAuthenticated, logout, refresh } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    isAuthenticated,
+    logout,
+    refresh,
+  } = useAuth();
   const [, setLocation] = useLocation();
-  const [page, setPage] = useState<PageKey>(() => (window.location.pathname.split("/").filter(Boolean).pop() || "overview") as PageKey);
+  const [page, setPage] = useState<PageKey>(
+    () =>
+      (window.location.pathname.split("/").filter(Boolean).pop() ||
+        "overview") as PageKey,
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [goalOpen, setGoalOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [authEmail, setAuthEmail] = useState(""); const [authPassword, setAuthPassword] = useState(""); const [authName, setAuthName] = useState("");
-  const dashboard = trpc.dashboard.get.useQuery(undefined, { enabled: isAuthenticated, retry: false });
-  const authMutation = trpc.auth.login.useMutation({ onSuccess: () => { refresh(); toast.success("Welcome back"); }, onError: e => toast.error(e.message) });
-  const signupMutation = trpc.auth.signup.useMutation({ onSuccess: () => { refresh(); toast.success("Account created"); }, onError: e => toast.error(e.message) });
-  const workflow = trpc.dashboard.runWorkflow.useMutation({ onSuccess: result => { toast.success(`Plan ready with ${result.taskCount} tasks`); dashboard.refetch(); }, onError: e => toast.error(e.message) });
-  const toggleTask = trpc.dashboard.toggleTask.useMutation({ onSuccess: () => dashboard.refetch(), onError: e => toast.error(e.message) });
-  const createGoal = trpc.dashboard.createGoal.useMutation({ onSuccess: () => { setGoalOpen(false); dashboard.refetch(); toast.success("Goal created"); }, onError: e => toast.error(e.message) });
-  const createTask = trpc.dashboard.createTask.useMutation({ onSuccess: () => { setTaskOpen(false); dashboard.refetch(); toast.success("Task created"); }, onError: e => toast.error(e.message) });
-  const goals = (dashboard.data?.goals || []) as Goal[]; const tasks = (dashboard.data?.tasks || []) as Task[]; const events = (dashboard.data?.activity || []) as Event[];
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const dashboard = trpc.dashboard.get.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const authMutation = trpc.auth.login.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Welcome back");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const signupMutation = trpc.auth.signup.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Account created");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const workflow = trpc.dashboard.runWorkflow.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Plan ready with ${result.taskCount} tasks`);
+      dashboard.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleTask = trpc.dashboard.toggleTask.useMutation({
+    onSuccess: () => dashboard.refetch(),
+    onError: (e) => toast.error(e.message),
+  });
+  const createGoal = trpc.dashboard.createGoal.useMutation({
+    onSuccess: () => {
+      setGoalOpen(false);
+      dashboard.refetch();
+      toast.success("Goal created");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const createTask = trpc.dashboard.createTask.useMutation({
+    onSuccess: () => {
+      setTaskOpen(false);
+      dashboard.refetch();
+      toast.success("Task created");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const goals = (dashboard.data?.goals || []) as Goal[];
+  const tasks = (dashboard.data?.tasks || []) as Task[];
+  const events = (dashboard.data?.activity || []) as Event[];
   const firstName = (user?.name || "there").split(" ")[0];
-  function navigate(next: PageKey) { setPage(next); setMobileOpen(false); setLocation(next === "overview" ? "/app" : `/app/${next}`); }
-  function submitPrompt() { if (!prompt.trim()) return; if (!isAuthenticated) return toast("Sign in to run an autonomous workflow"); workflow.mutate({ prompt: prompt.trim() }); setPrompt(""); }
+  function navigate(next: PageKey) {
+    setPage(next);
+    setMobileOpen(false);
+    setLocation(next === "overview" ? "/app" : `/app/${next}`);
+  }
+  function submitPrompt() {
+    if (!prompt.trim()) return;
+    if (!isAuthenticated) return toast("Sign in to run an autonomous workflow");
+    workflow.mutate({ prompt: prompt.trim() });
+    setPrompt("");
+  }
   const view = useMemo(() => {
     if (page === "chat") return <ChatView />;
-    if (page === "goals") return <GoalsView goals={goals} onCreate={() => setGoalOpen(true)} />;
-    if (page === "tasks") return <TasksView tasks={tasks} goals={goals} onToggle={id => toggleTask.mutate({ id, completed: tasks.find(t => t.id === id)?.status !== "completed" })} onCreate={() => setTaskOpen(true)} />;
+    if (page === "goals")
+      return <GoalsView goals={goals} onCreate={() => setGoalOpen(true)} />;
+    if (page === "tasks")
+      return (
+        <TasksView
+          tasks={tasks}
+          goals={goals}
+          onToggle={(id) =>
+            toggleTask.mutate({
+              id,
+              completed: tasks.find((t) => t.id === id)?.status !== "completed",
+            })
+          }
+          onCreate={() => setTaskOpen(true)}
+        />
+      );
     if (page === "memory") return <MemoryView />;
     if (page === "history") return <HistoryView />;
     if (page === "activity") return <ActivityView events={events} />;
-    if (page === "settings") return <SettingsView name={user?.name || "Workspace"} onLogout={() => { void logout().finally(() => setLocation("/login")); }} />;
-    if (["files", "agents", "tools"].includes(page)) return <PlaceholderView page={page} />;
-    return <OverviewView firstName={firstName} prompt={prompt} setPrompt={setPrompt} submitPrompt={submitPrompt} goals={goals} tasks={tasks} events={events} onNavigate={navigate} onToggle={id => toggleTask.mutate({ id, completed: tasks.find(t => t.id === id)?.status !== "completed" })} />;
-  }, [page, goals, tasks, events, prompt, firstName, user?.name, isAuthenticated]);
-  return <div className="min-h-screen bg-[#070b12] text-slate-100"><div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-cyan-400/[0.06] blur-3xl" /><div className="absolute -bottom-56 right-0 h-[34rem] w-[34rem] rounded-full bg-fuchsia-500/[0.04] blur-3xl" /></div><div className="relative flex min-h-screen">
-    <aside className={`fixed inset-y-0 left-0 z-50 w-[260px] border-r border-white/[0.08] bg-[#090e17]/95 px-4 py-5 backdrop-blur-xl transition-transform lg:static lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}><div className="flex items-center justify-between px-2"><button className="flex items-center gap-3 text-left" onClick={() => navigate("overview")}><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-blue-500 text-slate-950"><BrainCircuit className="h-5 w-5" /></span><span><span className="block text-sm font-bold text-white">Personal AI OS</span><span className="block text-[9px] uppercase tracking-[0.24em] text-slate-500">Agentic workspace</span></span></button><button className="rounded-lg p-2 text-slate-500 lg:hidden" onClick={() => setMobileOpen(false)}><X className="h-4 w-4" /></button></div><div className="my-7 h-px bg-white/[0.07]" /><nav className="space-y-6">{navGroups.map(group => <div key={group.label}><p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-slate-600">{group.label}</p><div className="space-y-1">{group.items.map(([key, label, Icon]) => <button key={key} onClick={() => navigate(key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${page === key ? "bg-cyan-300/[0.11] text-cyan-200 shadow-[inset_2px_0_0_#67e8f9]" : "text-slate-400 hover:bg-white/[0.045] hover:text-white"}`}><Icon className="h-4 w-4" /><span>{label}</span>{key === "tasks" && <span className="ml-auto rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px]">{tasks.filter(t => t.status !== "completed").length}</span>}</button>)}</div></div>)}</nav><button onClick={() => navigate("settings")} className="absolute bottom-5 left-4 right-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 hover:bg-white/[0.04] hover:text-slate-200"><Settings2 className="h-4 w-4" />Settings</button></aside>
-    {mobileOpen && <button aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-black/60 lg:hidden" />}<main className="min-w-0 flex-1"><header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/[0.07] bg-[#070b12]/80 px-5 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-400 lg:hidden"><Menu className="h-5 w-5" /></button><div className="text-sm font-semibold text-white">{page === "overview" ? "Overview" : page[0].toUpperCase() + page.slice(1)}</div></div><div className="flex items-center gap-3"><button onClick={() => navigate("chat")} className="hidden items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-xs text-slate-500 md:flex"><Search className="h-3.5 w-3.5" />Ask AI</button><button onClick={() => navigate("settings")} className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500 text-[11px] font-bold">{initials(user?.name)}</button></div></header><div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">{authLoading ? <div className="grid min-h-[70vh] place-items-center text-sm text-slate-400">Loading workspace…</div> : <>{!isAuthenticated && <AuthPanel mode={authMode} setMode={setAuthMode} name={authName} setName={setAuthName} email={authEmail} setEmail={setAuthEmail} password={authPassword} setPassword={setAuthPassword} pending={authMutation.isPending || signupMutation.isPending} onSubmit={() => authMode === "login" ? authMutation.mutate({ email: authEmail, password: authPassword }) : signupMutation.mutate({ name: authName, email: authEmail, password: authPassword })} />}{view}</>}</div></main></div>{goalOpen && <GoalModal pending={createGoal.isPending} onClose={() => setGoalOpen(false)} onSubmit={input => createGoal.mutate(input)} />}{taskOpen && <TaskModal goals={goals} pending={createTask.isPending} onClose={() => setTaskOpen(false)} onSubmit={input => createTask.mutate(input)} />}</div>;
+    if (page === "settings")
+      return (
+        <SettingsView
+          name={user?.name || "Workspace"}
+          onLogout={() => {
+            void logout().finally(() => setLocation("/login"));
+          }}
+        />
+      );
+    if (["files", "agents", "tools"].includes(page))
+      return <PlaceholderView page={page} />;
+    return (
+      <OverviewView
+        firstName={firstName}
+        prompt={prompt}
+        setPrompt={setPrompt}
+        submitPrompt={submitPrompt}
+        goals={goals}
+        tasks={tasks}
+        events={events}
+        onNavigate={navigate}
+        onToggle={(id) =>
+          toggleTask.mutate({
+            id,
+            completed: tasks.find((t) => t.id === id)?.status !== "completed",
+          })
+        }
+      />
+    );
+  }, [
+    page,
+    goals,
+    tasks,
+    events,
+    prompt,
+    firstName,
+    user?.name,
+    isAuthenticated,
+  ]);
+  return (
+    <div className="min-h-screen bg-[#070b12] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-cyan-400/[0.06] blur-3xl" />
+        <div className="absolute -bottom-56 right-0 h-[34rem] w-[34rem] rounded-full bg-fuchsia-500/[0.04] blur-3xl" />
+      </div>
+      <div className="relative flex min-h-screen">
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] border-r border-white/[0.08] bg-[#090e17]/95 px-4 py-5 backdrop-blur-xl transition-transform lg:static lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        >
+          <div className="flex items-center justify-between px-2">
+            <button
+              className="flex items-center gap-3 text-left"
+              onClick={() => navigate("overview")}
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-blue-500 text-slate-950">
+                <BrainCircuit className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-bold text-white">
+                  Personal AI OS
+                </span>
+                <span className="block text-[9px] uppercase tracking-[0.24em] text-slate-500">
+                  Agentic workspace
+                </span>
+              </span>
+            </button>
+            <button
+              className="rounded-lg p-2 text-slate-500 lg:hidden"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="my-7 h-px bg-white/[0.07]" />
+          <nav className="space-y-6">
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.22em] text-slate-600">
+                  {group.label}
+                </p>
+                <div className="space-y-1">
+                  {group.items.map(([key, label, Icon]) => (
+                    <button
+                      key={key}
+                      onClick={() => navigate(key)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${page === key ? "bg-cyan-300/[0.11] text-cyan-200 shadow-[inset_2px_0_0_#67e8f9]" : "text-slate-400 hover:bg-white/[0.045] hover:text-white"}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{label}</span>
+                      {key === "tasks" && (
+                        <span className="ml-auto rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px]">
+                          {tasks.filter((t) => t.status !== "completed").length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+          <button
+            onClick={() => navigate("settings")}
+            className="absolute bottom-5 left-4 right-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 hover:bg-white/[0.04] hover:text-slate-200"
+          >
+            <Settings2 className="h-4 w-4" />
+            Settings
+          </button>
+        </aside>
+        {mobileOpen && (
+          <button
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+            className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          />
+        )}
+        <main className="min-w-0 flex-1">
+          <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/[0.07] bg-[#070b12]/80 px-5 backdrop-blur-xl sm:px-8">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="rounded-lg p-2 text-slate-400 lg:hidden"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="text-sm font-semibold text-white">
+                {page === "overview"
+                  ? "Overview"
+                  : page[0].toUpperCase() + page.slice(1)}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("chat")}
+                className="hidden items-center gap-2 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-xs text-slate-500 md:flex"
+              >
+                <Search className="h-3.5 w-3.5" />
+                Ask AI
+              </button>
+              <button
+                onClick={() => navigate("settings")}
+                className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500 text-[11px] font-bold"
+              >
+                {initials(user?.name)}
+              </button>
+            </div>
+          </header>
+          <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
+            {authLoading ? (
+              <div className="grid min-h-[70vh] place-items-center text-sm text-slate-400">
+                Loading workspace…
+              </div>
+            ) : (
+              <>
+                {!isAuthenticated && (
+                  <AuthPanel
+                    mode={authMode}
+                    setMode={setAuthMode}
+                    name={authName}
+                    setName={setAuthName}
+                    email={authEmail}
+                    setEmail={setAuthEmail}
+                    password={authPassword}
+                    setPassword={setAuthPassword}
+                    pending={authMutation.isPending || signupMutation.isPending}
+                    onSubmit={() =>
+                      authMode === "login"
+                        ? authMutation.mutate({
+                            email: authEmail,
+                            password: authPassword,
+                          })
+                        : signupMutation.mutate({
+                            name: authName,
+                            email: authEmail,
+                            password: authPassword,
+                          })
+                    }
+                  />
+                )}
+                {view}
+              </>
+            )}
+          </div>
+        </main>
+      </div>
+      {goalOpen && (
+        <GoalModal
+          pending={createGoal.isPending}
+          onClose={() => setGoalOpen(false)}
+          onSubmit={(input) => createGoal.mutate(input)}
+        />
+      )}
+      {taskOpen && (
+        <TaskModal
+          goals={goals}
+          pending={createTask.isPending}
+          onClose={() => setTaskOpen(false)}
+          onSubmit={(input) => createTask.mutate(input)}
+        />
+      )}
+    </div>
+  );
 }
 
-function AuthPanel({ mode, setMode, name, setName, email, setEmail, password, setPassword, pending, onSubmit }: { mode: "login" | "signup"; setMode: (v: "login" | "signup") => void; name: string; setName: (v: string) => void; email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void; pending: boolean; onSubmit: () => void }) { return <div className="mb-8 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-5"><p className="text-sm font-semibold text-white">Your private workspace is ready</p><p className="mt-1 text-xs text-slate-400">Sign in to persist goals, tasks, memories, conversations, and history.</p><div className="mt-4 grid gap-3 sm:grid-cols-4">{mode === "signup" && <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none" />}<input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none" /><input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none" /><button disabled={pending} onClick={onSubmit} className="rounded-xl bg-cyan-300 px-4 py-2 text-xs font-bold text-slate-950">{pending ? "Working…" : mode === "login" ? "Sign in" : "Create account"}</button></div><button onClick={() => setMode(mode === "login" ? "signup" : "login")} className="mt-3 text-xs text-cyan-300">{mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}</button></div>; }
-function OverviewView({ firstName, prompt, setPrompt, submitPrompt, goals, tasks, events, onNavigate, onToggle }: { firstName: string; prompt: string; setPrompt: (v: string) => void; submitPrompt: () => void; goals: Goal[]; tasks: Task[]; events: Event[]; onNavigate: (v: PageKey) => void; onToggle: (id: number) => void }) { return <div className="space-y-8"><div><p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-lime-300/80">System online</p><h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">Good morning, {firstName}<span className="text-cyan-300">.</span><br /><span className="text-slate-400">What will you move forward today?</span></h1></div><div className="rounded-2xl border border-cyan-300/20 bg-[linear-gradient(115deg,rgba(15,35,50,0.86),rgba(11,18,30,0.96))] p-5 sm:p-6"><div className="mb-4 flex items-center gap-2 text-xs font-medium text-cyan-200"><Sparkles className="h-4 w-4" />Orchestrate a goal</div><textarea value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitPrompt(); } }} placeholder="Ask your AI OS to plan, research, organize, or analyze…" className="min-h-[72px] w-full resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-slate-600" /><div className="flex justify-end border-t border-white/[0.08] pt-4"><button onClick={submitPrompt} disabled={!prompt.trim()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-5 py-2.5 text-xs font-bold text-slate-950 disabled:opacity-40">Run workflow<ArrowUpRight className="h-4 w-4" /></button></div></div><div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]"><div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><SectionHeader eyebrow="Focus map" title="Active goals" action={<button onClick={() => onNavigate("goals")} className="text-xs text-cyan-300">View all <ChevronRight className="inline h-3 w-3" /></button>} />{goals.length === 0 ? <Empty text="No goals yet. Create your first goal to focus the workspace." /> : <div className="space-y-3">{goals.slice(0, 4).map(goal => <div key={goal.id} className="rounded-xl border border-white/[0.08] p-4"><div className="flex justify-between gap-3"><div><p className="text-sm font-semibold text-white">{goal.title}</p><p className="mt-1 text-xs text-slate-500">{goal.description || "No description"}</p></div><Pill tone={goal.priority === "high" ? "pink" : "slate"}>{goal.priority}</Pill></div><div className="mt-4 flex items-center gap-3"><div className="h-1.5 flex-1 rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-cyan-300" style={{ width: `${goal.progress}%` }} /></div><span className="text-xs text-slate-300">{goal.progress}%</span></div></div>)}</div>}</div><ActivityCard events={events} onOpen={() => onNavigate("activity")} /></div><div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><SectionHeader eyebrow="Today" title="Next actions" action={<button onClick={() => onNavigate("tasks")} className="text-xs text-cyan-300">Manage tasks</button>} />{tasks.length === 0 ? <Empty text="No tasks yet. Add a task or run a workflow." /> : <div className="grid gap-2 md:grid-cols-2">{tasks.slice(0, 8).map(task => <button key={task.id} onClick={() => onToggle(task.id)} className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left hover:border-white/[0.08]"><span className={`grid h-5 w-5 place-items-center rounded-full border ${task.status === "completed" ? "border-lime-300 bg-lime-300 text-slate-950" : "border-slate-600 text-transparent"}`}>{task.status === "completed" && <Check className="h-3 w-3" />}</span><span className={`truncate text-sm ${task.status === "completed" ? "text-slate-500 line-through" : "text-slate-200"}`}>{task.title}</span></button>)}</div>}</div></div>; }
-function ActivityCard({ events, onOpen }: { events: Event[]; onOpen: () => void }) { return <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><SectionHeader eyebrow="Live signal" title="AI activity" action={<Pill tone="lime">Live</Pill>} />{events.length === 0 ? <Empty text="No activity yet." /> : <div className="space-y-4">{events.slice(0, 4).map(event => <div key={event.id} className="flex gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-300" /><div><p className="text-xs font-medium text-slate-200">{event.title}</p><p className="mt-1 text-[11px] text-slate-500">{event.description}</p><p className="mt-1 text-[10px] text-slate-600">{formatRelative(event.createdAt)}</p></div></div>)}</div>}<button onClick={onOpen} className="mt-5 w-full border-t border-white/[0.07] pt-4 text-xs text-cyan-300">Open execution timeline</button></div>; }
-function GoalsView({ goals, onCreate }: { goals: Goal[]; onCreate: () => void }) { return <div><SectionHeader eyebrow="Workspace / focus map" title="Goals" detail="Keep the system pointed at outcomes." action={<button onClick={onCreate} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"><Plus className="h-4 w-4" />Create goal</button>} />{goals.length === 0 ? <Empty text="No goals yet. Create one to get started." /> : <div className="grid gap-4 lg:grid-cols-2">{goals.map(goal => <div key={goal.id} className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-300/10 text-cyan-300"><Target className="h-5 w-5" /></div><div><h3 className="font-semibold text-white">{goal.title}</h3><p className="mt-1 text-xs text-slate-500">{goal.description || "No description"}</p></div></div><Pill tone={goal.priority === "high" ? "pink" : "slate"}>{goal.priority}</Pill></div><div className="mt-6 flex items-center gap-4"><div className="h-2 flex-1 rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-cyan-300" style={{ width: `${goal.progress}%` }} /></div><span className="text-sm font-semibold text-white">{goal.progress}%</span></div></div>)}</div>}</div>; }
-function TasksView({ tasks, goals, onToggle, onCreate }: { tasks: Task[]; goals: Goal[]; onToggle: (id: number) => void; onCreate: () => void }) { return <div><SectionHeader eyebrow="Workspace / execution" title="Tasks" detail="The smallest useful next actions." action={<button onClick={onCreate} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"><Plus className="h-4 w-4" />New task</button>} />{tasks.length === 0 ? <Empty text="No tasks yet. Create one or run a workflow." /> : <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]"><div className="hidden grid-cols-[1fr_130px_110px_130px] gap-4 border-b border-white/[0.07] px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-slate-600 md:grid"><span>Task</span><span>Status</span><span>Priority</span><span>Agent</span></div>{tasks.map(task => <div key={task.id} className="grid gap-3 border-b border-white/[0.06] px-5 py-4 last:border-b-0 md:grid-cols-[1fr_130px_110px_130px] md:items-center"><button onClick={() => onToggle(task.id)} className="flex items-start gap-3 text-left"><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border ${task.status === "completed" ? "border-lime-300 bg-lime-300 text-slate-950" : "border-slate-600"}`}>{task.status === "completed" && <Check className="h-3 w-3" />}</span><span><p className={`text-sm font-medium ${task.status === "completed" ? "text-slate-500 line-through" : "text-slate-200"}`}>{task.title}</p><p className="mt-1 text-xs text-slate-600">{task.description}</p></span></button><Pill tone={task.status === "completed" ? "lime" : task.status === "in_progress" ? "blue" : "slate"}>{task.status.replace("_", " ")}</Pill><span className="text-xs capitalize text-slate-400">{task.priority}</span><span className="flex items-center gap-2 text-xs text-slate-400"><Bot className="h-3.5 w-3.5 text-cyan-300" />{task.agent}</span></div>)}</div>}</div>; }
-function MemoryView() { const query = trpc.memory.list.useQuery(); const create = trpc.memory.create.useMutation({ onSuccess: () => { query.refetch(); toast.success("Memory saved"); }, onError: e => toast.error(e.message) }); const [open, setOpen] = useState(false); const [content, setContent] = useState(""); return <div><SectionHeader eyebrow="Context / long-term memory" title="Memory" detail="Persisted memories are private to your account." action={<button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"><Plus className="h-4 w-4" />Save memory</button>} />{open && <div className="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-4"><input value={content} onChange={e => setContent(e.target.value)} placeholder="e.g. My main goal is to learn Python" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none" /><div className="mt-3 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-400">Cancel</button><button disabled={create.isPending || content.trim().length < 3} onClick={() => { create.mutate({ category: "Explicit memory", content: content.trim(), importance: 90 }); setOpen(false); }} className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-40">Save</button></div></div>}{!query.data?.length ? <Empty text="No saved memories yet." /> : <div className="grid gap-4 lg:grid-cols-3">{query.data.map(memory => <div key={memory.id} className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><Pill tone="blue">{memory.category}</Pill><p className="mt-5 min-h-[60px] text-sm leading-relaxed text-slate-200">“{memory.content}”</p><div className="mt-6"><div className="mb-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-slate-600"><span>Importance</span><span className="text-cyan-300">{memory.importance}%</span></div><div className="h-1.5 rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-cyan-300" style={{ width: `${memory.importance}%` }} /></div></div><div className="mt-5 flex items-center gap-2 border-t border-white/[0.07] pt-4 text-[11px] text-slate-600"><Lock className="h-3 w-3" />Private to your workspace</div></div>)}</div>}</div>; }
-function ChatView() { const history = trpc.chat.history.useQuery(undefined, { retry: false }); const send = trpc.chat.send.useMutation({ onSuccess: () => { setDraft(""); history.refetch(); }, onError: e => toast.error(e.message) }); const [draft, setDraft] = useState(""); const messages = history.data?.messages || []; return <div className="mx-auto max-w-4xl"><SectionHeader eyebrow="Communication / assistant" title="Chat" detail="Markdown responses, persisted conversations, and relevant private memory." /><div className="min-h-[420px] space-y-5 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7">{messages.length === 0 && <Empty text="Start a conversation. Try: Remember that my main goal is to learn Python." />}{messages.map(message => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-black/20 text-slate-200"}`}>{message.role === "assistant" ? <div className="markdown-content"><Streamdown mode="static">{message.content}</Streamdown></div> : message.content}</div></div>)}</div><form onSubmit={e => { e.preventDefault(); if (draft.trim()) send.mutate({ conversationId: history.data?.conversation?.id, content: draft.trim() }); }} className="mt-4 flex gap-3"><input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Message your AI OS…" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm outline-none focus:border-cyan-300/40" /><button disabled={send.isPending || !draft.trim()} className="rounded-xl bg-cyan-300 px-5 py-3 text-xs font-bold text-slate-950 disabled:opacity-40">{send.isPending ? "Sending…" : "Send"}</button></form></div>; }
-function HistoryView() { const query = trpc.history.list.useQuery(); return <div><SectionHeader eyebrow="Workspace / audit trail" title="History" detail="Your conversations, AI activity, goals, tasks, and memory events." />{!query.data ? <Empty text="Loading history…" /> : <div className="space-y-4">{[...(query.data.activity || []).map(item => ({ date: item.createdAt, title: item.title, detail: item.description || item.eventType, type: "Activity" })), ...(query.data.goals || []).map(item => ({ date: item.createdAt, title: `Goal created: ${item.title}`, detail: item.description || "", type: "Goal" })), ...(query.data.tasks || []).map(item => ({ date: item.createdAt, title: `Task created: ${item.title}`, detail: item.description || "", type: "Task" })), ...(query.data.memories || []).map(item => ({ date: item.createdAt, title: "Memory saved", detail: item.content, type: "Memory" }))].sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 80).map((item, index) => <div key={`${item.type}-${item.title}-${index}`} className="flex items-start gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4"><span className="mt-1 h-2 w-2 rounded-full bg-cyan-300" /><div className="min-w-0 flex-1"><div className="flex flex-wrap justify-between gap-2"><p className="text-sm font-medium text-slate-200">{item.title}</p><span className="text-[10px] text-slate-600">{formatRelative(item.date)}</span></div><p className="mt-1 text-xs text-slate-500">{item.detail}</p><Pill tone="slate">{item.type}</Pill></div></div>)}{query.data.activity.length + query.data.goals.length + query.data.tasks.length + query.data.memories.length === 0 && <Empty text="No history yet. Your saved activity will appear here." />}</div>}</div>; }
-function ActivityView({ events }: { events: Event[] }) { return <div><SectionHeader eyebrow="System / observability" title="Activity timeline" detail="A safe, human-readable trace of workspace activity." />{events.length === 0 ? <Empty text="No activity yet." /> : <div className="max-w-3xl space-y-4">{events.map(event => <div key={event.id} className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"><div className="flex justify-between gap-3"><p className="text-sm font-medium text-slate-200">{event.title}</p><span className="text-[10px] text-slate-600">{formatRelative(event.createdAt)}</span></div><p className="mt-1 text-xs text-slate-500">{event.description}</p><p className="mt-2 text-[10px] text-cyan-300/70">{event.agent || "System"}</p></div>)}</div>}</div>; }
-function PlaceholderView({ page }: { page: string }) { return <div><SectionHeader eyebrow="System" title={page[0].toUpperCase() + page.slice(1)} detail="This workspace area is ready for your next integration." /><Empty text="No records yet." /></div>; }
-function SettingsView({ name, onLogout }: { name: string; onLogout: () => void }) { return <div><SectionHeader eyebrow="Workspace / account" title="Settings" detail="Manage your private workspace session." /><div className="max-w-xl rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6"><p className="text-sm text-slate-400">Signed in as</p><p className="mt-1 text-lg font-semibold text-white">{name}</p><button onClick={onLogout} className="mt-6 rounded-xl border border-rose-300/30 px-4 py-2 text-xs text-rose-200">Sign out</button></div></div>; }
-function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-dashed border-white/[0.12] p-10 text-center text-sm text-slate-500">{text}</div>; }
-function GoalModal({ pending, onClose, onSubmit }: { pending: boolean; onClose: () => void; onSubmit: (input: { title: string; description?: string; priority: "low" | "medium" | "high" }) => void }) { const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [priority, setPriority] = useState<"low" | "medium" | "high">("medium"); return <Modal title="Create goal" onClose={onClose}><input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Goal title" className="field" /><textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" className="field min-h-24" /><select value={priority} onChange={e => setPriority(e.target.value as typeof priority)} className="field"><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select><button disabled={pending || title.trim().length < 3} onClick={() => onSubmit({ title: title.trim(), description: description.trim() || undefined, priority })} className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40">{pending ? "Creating…" : "Create goal"}</button></Modal>; }
-function TaskModal({ goals, pending, onClose, onSubmit }: { goals: Goal[]; pending: boolean; onClose: () => void; onSubmit: (input: { title: string; description?: string; priority: "low" | "medium" | "high"; goalId?: number | null }) => void }) { const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [priority, setPriority] = useState<"low" | "medium" | "high">("medium"); const [goalId, setGoalId] = useState(""); return <Modal title="New task" onClose={onClose}><input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Task title" className="field" /><textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" className="field min-h-24" /><div className="grid grid-cols-2 gap-3"><select value={priority} onChange={e => setPriority(e.target.value as typeof priority)} className="field"><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select><select value={goalId} onChange={e => setGoalId(e.target.value)} className="field"><option value="">No goal</option>{goals.map(goal => <option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></div><button disabled={pending || title.trim().length < 3} onClick={() => onSubmit({ title: title.trim(), description: description.trim() || undefined, priority, goalId: goalId ? Number(goalId) : null })} className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40">{pending ? "Creating…" : "Create task"}</button></Modal>; }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4"><div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0d1420] p-6 shadow-2xl"><div className="mb-5 flex items-center justify-between"><h3 className="text-lg font-semibold text-white">{title}</h3><button onClick={onClose} className="text-slate-500"><X className="h-5 w-5" /></button></div><div className="space-y-3">{children}</div></div></div>; }
+function AuthPanel({
+  mode,
+  setMode,
+  name,
+  setName,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  pending,
+  onSubmit,
+}: {
+  mode: "login" | "signup";
+  setMode: (v: "login" | "signup") => void;
+  name: string;
+  setName: (v: string) => void;
+  email: string;
+  setEmail: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  pending: boolean;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="mb-8 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-5">
+      <p className="text-sm font-semibold text-white">
+        Your private workspace is ready
+      </p>
+      <p className="mt-1 text-xs text-slate-400">
+        Sign in to persist goals, tasks, memories, conversations, and history.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {mode === "signup" && (
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+            className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+          />
+        )}
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          type="email"
+          className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          type="password"
+          className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+        />
+        <button
+          disabled={pending}
+          onClick={onSubmit}
+          className="rounded-xl bg-cyan-300 px-4 py-2 text-xs font-bold text-slate-950"
+        >
+          {pending
+            ? "Working…"
+            : mode === "login"
+              ? "Sign in"
+              : "Create account"}
+        </button>
+      </div>
+      <button
+        onClick={() => setMode(mode === "login" ? "signup" : "login")}
+        className="mt-3 text-xs text-cyan-300"
+      >
+        {mode === "login"
+          ? "Need an account? Sign up"
+          : "Already have an account? Sign in"}
+      </button>
+    </div>
+  );
+}
+function OverviewView({
+  firstName,
+  prompt,
+  setPrompt,
+  submitPrompt,
+  goals,
+  tasks,
+  events,
+  onNavigate,
+  onToggle,
+}: {
+  firstName: string;
+  prompt: string;
+  setPrompt: (v: string) => void;
+  submitPrompt: () => void;
+  goals: Goal[];
+  tasks: Task[];
+  events: Event[];
+  onNavigate: (v: PageKey) => void;
+  onToggle: (id: number) => void;
+}) {
+  return (
+    <div className="space-y-8">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-lime-300/80">
+          System online
+        </p>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+          Good morning, {firstName}
+          <span className="text-cyan-300">.</span>
+          <br />
+          <span className="text-slate-400">
+            What will you move forward today?
+          </span>
+        </h1>
+      </div>
+      <div className="rounded-2xl border border-cyan-300/20 bg-[linear-gradient(115deg,rgba(15,35,50,0.86),rgba(11,18,30,0.96))] p-5 sm:p-6">
+        <div className="mb-4 flex items-center gap-2 text-xs font-medium text-cyan-200">
+          <Sparkles className="h-4 w-4" />
+          Orchestrate a goal
+        </div>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submitPrompt();
+            }
+          }}
+          placeholder="Ask your AI OS to plan, research, organize, or analyze…"
+          className="min-h-[72px] w-full resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-slate-600"
+        />
+        <div className="flex justify-end border-t border-white/[0.08] pt-4">
+          <button
+            onClick={submitPrompt}
+            disabled={!prompt.trim()}
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-5 py-2.5 text-xs font-bold text-slate-950 disabled:opacity-40"
+          >
+            Run workflow
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5">
+          <SectionHeader
+            eyebrow="Focus map"
+            title="Active goals"
+            action={
+              <button
+                onClick={() => onNavigate("goals")}
+                className="text-xs text-cyan-300"
+              >
+                View all <ChevronRight className="inline h-3 w-3" />
+              </button>
+            }
+          />
+          {goals.length === 0 ? (
+            <Empty text="No goals yet. Create your first goal to focus the workspace." />
+          ) : (
+            <div className="space-y-3">
+              {goals.slice(0, 4).map((goal) => (
+                <div
+                  key={goal.id}
+                  className="rounded-xl border border-white/[0.08] p-4"
+                >
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {goal.title}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {goal.description || "No description"}
+                      </p>
+                    </div>
+                    <Pill tone={goal.priority === "high" ? "pink" : "slate"}>
+                      {goal.priority}
+                    </Pill>
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="h-1.5 flex-1 rounded-full bg-white/[0.08]">
+                      <div
+                        className="h-full rounded-full bg-cyan-300"
+                        style={{ width: `${goal.progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-slate-300">
+                      {goal.progress}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <ActivityCard events={events} onOpen={() => onNavigate("activity")} />
+      </div>
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5">
+        <SectionHeader
+          eyebrow="Today"
+          title="Next actions"
+          action={
+            <button
+              onClick={() => onNavigate("tasks")}
+              className="text-xs text-cyan-300"
+            >
+              Manage tasks
+            </button>
+          }
+        />
+        {tasks.length === 0 ? (
+          <Empty text="No tasks yet. Add a task or run a workflow." />
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {tasks.slice(0, 8).map((task) => (
+              <button
+                key={task.id}
+                onClick={() => onToggle(task.id)}
+                className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left hover:border-white/[0.08]"
+              >
+                <span
+                  className={`grid h-5 w-5 place-items-center rounded-full border ${task.status === "completed" ? "border-lime-300 bg-lime-300 text-slate-950" : "border-slate-600 text-transparent"}`}
+                >
+                  {task.status === "completed" && <Check className="h-3 w-3" />}
+                </span>
+                <span
+                  className={`truncate text-sm ${task.status === "completed" ? "text-slate-500 line-through" : "text-slate-200"}`}
+                >
+                  {task.title}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function ActivityCard({
+  events,
+  onOpen,
+}: {
+  events: Event[];
+  onOpen: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5">
+      <SectionHeader
+        eyebrow="Live signal"
+        title="AI activity"
+        action={<Pill tone="lime">Live</Pill>}
+      />
+      {events.length === 0 ? (
+        <Empty text="No activity yet." />
+      ) : (
+        <div className="space-y-4">
+          {events.slice(0, 4).map((event) => (
+            <div key={event.id} className="flex gap-3">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-300" />
+              <div>
+                <p className="text-xs font-medium text-slate-200">
+                  {event.title}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {event.description}
+                </p>
+                <p className="mt-1 text-[10px] text-slate-600">
+                  {formatRelative(event.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={onOpen}
+        className="mt-5 w-full border-t border-white/[0.07] pt-4 text-xs text-cyan-300"
+      >
+        Open execution timeline
+      </button>
+    </div>
+  );
+}
+function GoalsView({
+  goals,
+  onCreate,
+}: {
+  goals: Goal[];
+  onCreate: () => void;
+}) {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Workspace / focus map"
+        title="Goals"
+        detail="Keep the system pointed at outcomes."
+        action={
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"
+          >
+            <Plus className="h-4 w-4" />
+            Create goal
+          </button>
+        }
+      />
+      {goals.length === 0 ? (
+        <Empty text="No goals yet. Create one to get started." />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {goals.map((goal) => (
+            <div
+              key={goal.id}
+              className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-300/10 text-cyan-300">
+                    <Target className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">{goal.title}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {goal.description || "No description"}
+                    </p>
+                  </div>
+                </div>
+                <Pill tone={goal.priority === "high" ? "pink" : "slate"}>
+                  {goal.priority}
+                </Pill>
+              </div>
+              <div className="mt-6 flex items-center gap-4">
+                <div className="h-2 flex-1 rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full bg-cyan-300"
+                    style={{ width: `${goal.progress}%` }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-white">
+                  {goal.progress}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function TasksView({
+  tasks,
+  goals,
+  onToggle,
+  onCreate,
+}: {
+  tasks: Task[];
+  goals: Goal[];
+  onToggle: (id: number) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Workspace / execution"
+        title="Tasks"
+        detail="The smallest useful next actions."
+        action={
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"
+          >
+            <Plus className="h-4 w-4" />
+            New task
+          </button>
+        }
+      />
+      {tasks.length === 0 ? (
+        <Empty text="No tasks yet. Create one or run a workflow." />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+          <div className="hidden grid-cols-[1fr_130px_110px_130px] gap-4 border-b border-white/[0.07] px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-slate-600 md:grid">
+            <span>Task</span>
+            <span>Status</span>
+            <span>Priority</span>
+            <span>Agent</span>
+          </div>
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              className="grid gap-3 border-b border-white/[0.06] px-5 py-4 last:border-b-0 md:grid-cols-[1fr_130px_110px_130px] md:items-center"
+            >
+              <button
+                onClick={() => onToggle(task.id)}
+                className="flex items-start gap-3 text-left"
+              >
+                <span
+                  className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border ${task.status === "completed" ? "border-lime-300 bg-lime-300 text-slate-950" : "border-slate-600"}`}
+                >
+                  {task.status === "completed" && <Check className="h-3 w-3" />}
+                </span>
+                <span>
+                  <p
+                    className={`text-sm font-medium ${task.status === "completed" ? "text-slate-500 line-through" : "text-slate-200"}`}
+                  >
+                    {task.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {task.description}
+                  </p>
+                </span>
+              </button>
+              <Pill
+                tone={
+                  task.status === "completed"
+                    ? "lime"
+                    : task.status === "in_progress"
+                      ? "blue"
+                      : "slate"
+                }
+              >
+                {task.status.replace("_", " ")}
+              </Pill>
+              <span className="text-xs capitalize text-slate-400">
+                {task.priority}
+              </span>
+              <span className="flex items-center gap-2 text-xs text-slate-400">
+                <Bot className="h-3.5 w-3.5 text-cyan-300" />
+                {task.agent}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function MemoryView() {
+  const query = trpc.memory.list.useQuery();
+  const create = trpc.memory.create.useMutation({
+    onSuccess: () => {
+      query.refetch();
+      toast.success("Memory saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState("");
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Context / long-term memory"
+        title="Memory"
+        detail="Persisted memories are private to your account."
+        action={
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"
+          >
+            <Plus className="h-4 w-4" />
+            Save memory
+          </button>
+        }
+      />
+      {open && (
+        <div className="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-4">
+          <input
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="e.g. My main goal is to learn Python"
+            className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-3 py-2 text-xs text-slate-400"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={create.isPending || content.trim().length < 3}
+              onClick={() => {
+                create.mutate({
+                  category: "Explicit memory",
+                  content: content.trim(),
+                  importance: 90,
+                });
+                setOpen(false);
+              }}
+              className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+      {!query.data?.length ? (
+        <Empty text="No saved memories yet." />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {query.data.map((memory) => (
+            <div
+              key={memory.id}
+              className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"
+            >
+              <Pill tone="blue">{memory.category}</Pill>
+              <p className="mt-5 min-h-[60px] text-sm leading-relaxed text-slate-200">
+                “{memory.content}”
+              </p>
+              <div className="mt-6">
+                <div className="mb-2 flex justify-between text-[10px] uppercase tracking-[0.15em] text-slate-600">
+                  <span>Importance</span>
+                  <span className="text-cyan-300">{memory.importance}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full bg-cyan-300"
+                    style={{ width: `${memory.importance}%` }}
+                  />
+                </div>
+              </div>
+              <div className="mt-5 flex items-center gap-2 border-t border-white/[0.07] pt-4 text-[11px] text-slate-600">
+                <Lock className="h-3 w-3" />
+                Private to your workspace
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function ChatView() {
+  const history = trpc.chat.history.useQuery(undefined, { retry: false });
+  const send = trpc.chat.send.useMutation({
+    onSuccess: () => {
+      setDraft("");
+      history.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const [draft, setDraft] = useState("");
+  const messages = history.data?.messages || [];
+  return (
+    <div className="mx-auto max-w-4xl">
+      <SectionHeader
+        eyebrow="Communication / assistant"
+        title="Chat"
+        detail="Markdown responses, persisted conversations, and relevant private memory."
+      />
+      <div className="min-h-[420px] space-y-5 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7">
+        {messages.length === 0 && (
+          <Empty text="Start a conversation. Try: Remember that my main goal is to learn Python." />
+        )}
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-black/20 text-slate-200"}`}
+            >
+              {message.role === "assistant" ? (
+                <div className="markdown-content">
+                  <Streamdown mode="static">{message.content}</Streamdown>
+                </div>
+              ) : (
+                message.content
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (draft.trim())
+            send.mutate({
+              conversationId: history.data?.conversation?.id,
+              content: draft.trim(),
+            });
+        }}
+        className="mt-4 flex gap-3"
+      >
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Message your AI OS…"
+          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm outline-none focus:border-cyan-300/40"
+        />
+        <button
+          disabled={send.isPending || !draft.trim()}
+          className="rounded-xl bg-cyan-300 px-5 py-3 text-xs font-bold text-slate-950 disabled:opacity-40"
+        >
+          {send.isPending ? "Sending…" : "Send"}
+        </button>
+      </form>
+    </div>
+  );
+}
+function HistoryView() {
+  const query = trpc.history.list.useQuery();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const conversation = trpc.chat.history.useQuery(
+    selectedId ? { conversationId: selectedId } : undefined,
+    { enabled: selectedId !== null },
+  );
+  const selectedConversation = query.data?.conversations.find(
+    (item) => item.id === selectedId,
+  );
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Workspace / audit trail"
+        title="History"
+        detail="Your conversations, AI activity, goals, tasks, and memory events."
+      />
+      {!query.data ? (
+        <Empty text="Loading history…" />
+      ) : (
+        <div className="space-y-6">
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">
+                Conversations
+              </h3>
+              <span className="text-xs text-slate-500">
+                {query.data.conversations.length} saved
+              </span>
+            </div>
+            {query.data.conversations.length === 0 ? (
+              <Empty text="No conversations yet. Start chatting to create one." />
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {query.data.conversations.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedId(item.id)}
+                    className={`rounded-2xl border p-4 text-left transition-colors ${selectedId === item.id ? "border-cyan-300/40 bg-cyan-300/[0.08]" : "border-white/[0.08] bg-white/[0.025] hover:border-white/20"}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="truncate text-sm font-medium text-slate-200">
+                        {item.title}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-slate-600">
+                        {formatRelative(item.updatedAt)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Open saved messages
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+          {selectedId !== null && (
+            <section className="rounded-2xl border border-cyan-300/20 bg-white/[0.025] p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-300/80">
+                    Saved conversation
+                  </p>
+                  <h3 className="mt-1 font-semibold text-white">
+                    {selectedConversation?.title || "Conversation"}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="text-xs text-slate-500 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+              {conversation.isLoading ? (
+                <Empty text="Loading messages…" />
+              ) : conversation.data?.messages.length ? (
+                <div className="space-y-4">
+                  {conversation.data.messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-black/20 text-slate-200"}`}
+                      >
+                        {message.role === "assistant" ? (
+                          <div className="markdown-content">
+                            <Streamdown mode="static">
+                              {message.content}
+                            </Streamdown>
+                          </div>
+                        ) : (
+                          message.content
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty text="This conversation has no messages." />
+              )}
+            </section>
+          )}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold text-white">
+              Workspace activity
+            </h3>
+            <div className="space-y-4">
+              {[
+                ...(query.data.activity || []).map((item) => ({
+                  date: item.createdAt,
+                  title: item.title,
+                  detail: item.description || item.eventType,
+                  type: "Activity",
+                })),
+                ...(query.data.goals || []).map((item) => ({
+                  date: item.createdAt,
+                  title: `Goal created: ${item.title}`,
+                  detail: item.description || "",
+                  type: "Goal",
+                })),
+                ...(query.data.tasks || []).map((item) => ({
+                  date: item.createdAt,
+                  title: `Task created: ${item.title}`,
+                  detail: item.description || "",
+                  type: "Task",
+                })),
+                ...(query.data.memories || []).map((item) => ({
+                  date: item.createdAt,
+                  title: "Memory saved",
+                  detail: item.content,
+                  type: "Memory",
+                })),
+              ]
+                .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+                .slice(0, 80)
+                .map((item, index) => (
+                  <div
+                    key={`${item.type}-${item.title}-${index}`}
+                    className="flex items-start gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4"
+                  >
+                    <span className="mt-1 h-2 w-2 rounded-full bg-cyan-300" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <p className="text-sm font-medium text-slate-200">
+                          {item.title}
+                        </p>
+                        <span className="text-[10px] text-slate-600">
+                          {formatRelative(item.date)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.detail}
+                      </p>
+                      <Pill tone="slate">{item.type}</Pill>
+                    </div>
+                  </div>
+                ))}
+              {query.data.activity.length +
+                query.data.goals.length +
+                query.data.tasks.length +
+                query.data.memories.length ===
+                0 && (
+                <Empty text="No history yet. Your saved activity will appear here." />
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+function ActivityView({ events }: { events: Event[] }) {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="System / observability"
+        title="Activity timeline"
+        detail="A safe, human-readable trace of workspace activity."
+      />
+      {events.length === 0 ? (
+        <Empty text="No activity yet." />
+      ) : (
+        <div className="max-w-3xl space-y-4">
+          {events.map((event) => (
+            <div
+              key={event.id}
+              className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5"
+            >
+              <div className="flex justify-between gap-3">
+                <p className="text-sm font-medium text-slate-200">
+                  {event.title}
+                </p>
+                <span className="text-[10px] text-slate-600">
+                  {formatRelative(event.createdAt)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">{event.description}</p>
+              <p className="mt-2 text-[10px] text-cyan-300/70">
+                {event.agent || "System"}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function PlaceholderView({ page }: { page: string }) {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="System"
+        title={page[0].toUpperCase() + page.slice(1)}
+        detail="This workspace area is ready for your next integration."
+      />
+      <Empty text="No records yet." />
+    </div>
+  );
+}
+function SettingsView({
+  name,
+  onLogout,
+}: {
+  name: string;
+  onLogout: () => void;
+}) {
+  return (
+    <div>
+      <SectionHeader
+        eyebrow="Workspace / account"
+        title="Settings"
+        detail="Manage your private workspace session."
+      />
+      <div className="max-w-xl rounded-2xl border border-white/[0.08] bg-white/[0.025] p-6">
+        <p className="text-sm text-slate-400">Signed in as</p>
+        <p className="mt-1 text-lg font-semibold text-white">{name}</p>
+        <button
+          onClick={onLogout}
+          className="mt-6 rounded-xl border border-rose-300/30 px-4 py-2 text-xs text-rose-200"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/[0.12] p-10 text-center text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+function GoalModal({
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (input: {
+    title: string;
+    description?: string;
+    priority: "low" | "medium" | "high";
+  }) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  return (
+    <Modal title="Create goal" onClose={onClose}>
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Goal title"
+        className="field"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description (optional)"
+        className="field min-h-24"
+      />
+      <select
+        value={priority}
+        onChange={(e) => setPriority(e.target.value as typeof priority)}
+        className="field"
+      >
+        <option value="low">Low priority</option>
+        <option value="medium">Medium priority</option>
+        <option value="high">High priority</option>
+      </select>
+      <button
+        disabled={pending || title.trim().length < 3}
+        onClick={() =>
+          onSubmit({
+            title: title.trim(),
+            description: description.trim() || undefined,
+            priority,
+          })
+        }
+        className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40"
+      >
+        {pending ? "Creating…" : "Create goal"}
+      </button>
+    </Modal>
+  );
+}
+function TaskModal({
+  goals,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  goals: Goal[];
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (input: {
+    title: string;
+    description?: string;
+    priority: "low" | "medium" | "high";
+    goalId?: number | null;
+  }) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [goalId, setGoalId] = useState("");
+  return (
+    <Modal title="New task" onClose={onClose}>
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Task title"
+        className="field"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description (optional)"
+        className="field min-h-24"
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as typeof priority)}
+          className="field"
+        >
+          <option value="low">Low priority</option>
+          <option value="medium">Medium priority</option>
+          <option value="high">High priority</option>
+        </select>
+        <select
+          value={goalId}
+          onChange={(e) => setGoalId(e.target.value)}
+          className="field"
+        >
+          <option value="">No goal</option>
+          {goals.map((goal) => (
+            <option key={goal.id} value={goal.id}>
+              {goal.title}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        disabled={pending || title.trim().length < 3}
+        onClick={() =>
+          onSubmit({
+            title: title.trim(),
+            description: description.trim() || undefined,
+            priority,
+            goalId: goalId ? Number(goalId) : null,
+          })
+        }
+        className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40"
+      >
+        {pending ? "Creating…" : "Create task"}
+      </button>
+    </Modal>
+  );
+}
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0d1420] p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-slate-500">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-3">{children}</div>
+      </div>
+    </div>
+  );
+}
