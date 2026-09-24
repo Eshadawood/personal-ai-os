@@ -573,6 +573,14 @@ function readLLMText(content) {
   if (Array.isArray(content)) return content.map((part) => typeof part === "string" ? part : part.text ?? "").join("\n");
   return "";
 }
+function extractExplicitMemory(content) {
+  const match = content.match(/\bremember(?: that)?\s+(.+?)(?:[.!?]|$)/i);
+  return match?.[1]?.trim() || null;
+}
+function selectRelevantMemories(memories2, query) {
+  const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 2);
+  return memories2.map((memory) => ({ memory, score: terms.reduce((score, term) => score + (memory.content.toLowerCase().includes(term) ? 1 : 0), 0) })).filter((item) => item.score > 0).sort((a, b) => b.score - a.score || b.memory.importance - a.memory.importance).slice(0, 8).map((item) => item.memory);
+}
 function requireInsertedId(rows, entity) {
   const id = rows?.[0]?.id;
   if (typeof id !== "number" || !Number.isInteger(id) || id <= 0) {
@@ -806,9 +814,17 @@ var appRouter = router({
         conversationId = requireInsertedId(await db.insert(conversations).values({ userId: ctx.user.id, title: input.content.slice(0, 80) }).$returningId(), "Conversation");
       }
       await db.insert(messages).values({ conversationId, userId: ctx.user.id, role: "user", content: input.content });
-      let answer = "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
+      const explicitMemory = extractExplicitMemory(input.content);
+      if (explicitMemory) {
+        await db.insert(memories).values({ userId: ctx.user.id, category: "Explicit memory", content: explicitMemory, importance: 90 });
+        await recordActivity({ userId: ctx.user.id, eventType: "memory_saved", title: "Memory saved from chat", description: explicitMemory, agent: "Memory Agent" });
+      }
+      const storedMemories = await db.select({ content: memories.content, category: memories.category, importance: memories.importance }).from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.updatedAt)).limit(50);
+      const relevantMemories = selectRelevantMemories(storedMemories, input.content);
+      const memoryContext = relevantMemories.length ? "\n\nRelevant private memories (use them when helpful, never invent beyond them):\n" + relevantMemories.map((memory) => "- [" + memory.category + "] " + memory.content).join("\n") : "";
+      let answer = explicitMemory ? "I\u2019ll remember that: " + explicitMemory : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
       try {
-        const response = await invokeLLM({ messages: [{ role: "system", content: "You are the Personal AI OS assistant. Give concise, actionable answers. Never claim to have taken sensitive external actions without approval." }, { role: "user", content: input.content }], maxTokens: 700 });
+        const response = await invokeLLM({ messages: [{ role: "system", content: "You are the Personal AI OS assistant. Give concise, actionable answers. Use Markdown for structure (headings, lists, tables, and code when useful). Never claim to have taken sensitive external actions without approval." + memoryContext }, { role: "user", content: input.content }], maxTokens: 700 });
         answer = readLLMText(response.choices[0]?.message?.content) || answer;
       } catch (error) {
         console.warn("[chat] AI response unavailable", error);
@@ -823,6 +839,21 @@ var appRouter = router({
       const db = await getDb();
       if (!db) return [];
       return db.select().from(activityEvents).where(eq2(activityEvents.userId, ctx.user.id)).orderBy(desc2(activityEvents.createdAt)).limit(40);
+    })
+  }),
+  history: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return { conversations: [], messages: [], activity: [], goals: [], tasks: [], memories: [] };
+      const [userConversations, userMessages, userActivity, userGoals, userTasks, userMemories] = await Promise.all([
+        db.select().from(conversations).where(eq2(conversations.userId, ctx.user.id)).orderBy(desc2(conversations.updatedAt)),
+        db.select().from(messages).where(eq2(messages.userId, ctx.user.id)).orderBy(desc2(messages.createdAt)).limit(100),
+        db.select().from(activityEvents).where(eq2(activityEvents.userId, ctx.user.id)).orderBy(desc2(activityEvents.createdAt)).limit(100),
+        db.select().from(goals).where(eq2(goals.userId, ctx.user.id)).orderBy(desc2(goals.createdAt)),
+        db.select().from(tasks).where(eq2(tasks.userId, ctx.user.id)).orderBy(desc2(tasks.createdAt)),
+        db.select().from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.createdAt))
+      ]);
+      return { conversations: userConversations, messages: userMessages, activity: userActivity, goals: userGoals, tasks: userTasks, memories: userMemories };
     })
   })
 });
