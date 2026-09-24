@@ -767,24 +767,20 @@ export const appRouter = router({
             "Conversation",
           );
         }
-        await db
-          .insert(messages)
-          .values({
-            conversationId,
-            userId: ctx.user.id,
-            role: "user",
-            content: input.content,
-          });
+        await db.insert(messages).values({
+          conversationId,
+          userId: ctx.user.id,
+          role: "user",
+          content: input.content,
+        });
         const explicitMemory = extractExplicitMemory(input.content);
         if (explicitMemory) {
-          await db
-            .insert(memories)
-            .values({
-              userId: ctx.user.id,
-              category: "Explicit memory",
-              content: explicitMemory,
-              importance: 90,
-            });
+          await db.insert(memories).values({
+            userId: ctx.user.id,
+            category: "Explicit memory",
+            content: explicitMemory,
+            importance: 90,
+          });
           await recordActivity({
             userId: ctx.user.id,
             eventType: "memory_saved",
@@ -818,13 +814,15 @@ export const appRouter = router({
           : "";
         const isMemoryRecall =
           !explicitMemory &&
-          relevantMemories.length > 0 &&
-          /\b(what|which|do you remember|remember)\b/i.test(input.content);
+          storedMemories.length > 0 &&
+          /\b(what|which|do you remember|remember|main goal|my goal)\b/i.test(
+            input.content,
+          );
         let answer = explicitMemory
           ? "I’ll remember that: " + explicitMemory
           : isMemoryRecall
             ? "I remember: " +
-              relevantMemories.map((memory) => memory.content).join("; ")
+              memoriesForPrompt.map((memory) => memory.content).join("; ")
             : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
         if (!isMemoryRecall) {
           try {
@@ -846,14 +844,12 @@ export const appRouter = router({
             console.warn("[chat] AI response unavailable", error);
           }
         }
-        await db
-          .insert(messages)
-          .values({
-            conversationId,
-            userId: ctx.user.id,
-            role: "assistant",
-            content: answer,
-          });
+        await db.insert(messages).values({
+          conversationId,
+          userId: ctx.user.id,
+          role: "assistant",
+          content: answer,
+        });
         await db
           .update(conversations)
           .set({ updatedAt: new Date() })

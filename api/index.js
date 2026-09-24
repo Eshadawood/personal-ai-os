@@ -1121,8 +1121,10 @@ var appRouter = router({
       );
       const memoriesForPrompt = relevantMemories.length ? relevantMemories : storedMemories.slice(0, 8);
       const memoryContext = memoriesForPrompt.length ? "\n\nRelevant private memories (use these as the source of truth when the user asks about their preferences, goals, or remembered facts; never invent beyond them):\n" + memoriesForPrompt.map((memory) => "- [" + memory.category + "] " + memory.content).join("\n") : "";
-      const isMemoryRecall = !explicitMemory && relevantMemories.length > 0 && /\b(what|which|do you remember|remember)\b/i.test(input.content);
-      let answer = explicitMemory ? "I\u2019ll remember that: " + explicitMemory : isMemoryRecall ? "I remember: " + relevantMemories.map((memory) => memory.content).join("; ") : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
+      const isMemoryRecall = !explicitMemory && storedMemories.length > 0 && /\b(what|which|do you remember|remember|main goal|my goal)\b/i.test(
+        input.content
+      );
+      let answer = explicitMemory ? "I\u2019ll remember that: " + explicitMemory : isMemoryRecall ? "I remember: " + memoriesForPrompt.map((memory) => memory.content).join("; ") : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
       if (!isMemoryRecall) {
         try {
           const response = await invokeLLM({
