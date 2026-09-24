@@ -565,12 +565,21 @@ var planSchema = {
         }
       }
     },
-    required: ["goalTitle", "goalDescription", "summary", "recommendation", "tasks"]
+    required: [
+      "goalTitle",
+      "goalDescription",
+      "summary",
+      "recommendation",
+      "tasks"
+    ]
   }
 };
 function readLLMText(content) {
   if (typeof content === "string") return content;
-  if (Array.isArray(content)) return content.map((part) => typeof part === "string" ? part : part.text ?? "").join("\n");
+  if (Array.isArray(content))
+    return content.map(
+      (part) => typeof part === "string" ? part : part.text ?? ""
+    ).join("\n");
   return "";
 }
 function extractExplicitMemory(content) {
@@ -579,18 +588,32 @@ function extractExplicitMemory(content) {
 }
 function selectRelevantMemories(memories2, query) {
   const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 2);
-  return memories2.map((memory) => ({ memory, score: terms.reduce((score, term) => score + (memory.content.toLowerCase().includes(term) ? 1 : 0), 0) })).filter((item) => item.score > 0).sort((a, b) => b.score - a.score || b.memory.importance - a.memory.importance).slice(0, 8).map((item) => item.memory);
+  return memories2.map((memory) => ({
+    memory,
+    score: terms.reduce(
+      (score, term) => score + (memory.content.toLowerCase().includes(term) ? 1 : 0),
+      0
+    )
+  })).filter((item) => item.score > 0).sort(
+    (a, b) => b.score - a.score || b.memory.importance - a.memory.importance
+  ).slice(0, 8).map((item) => item.memory);
 }
 function requireInsertedId(rows, entity) {
   const id = rows?.[0]?.id;
   if (typeof id !== "number" || !Number.isInteger(id) || id <= 0) {
-    throw new TRPCError2({ code: "INTERNAL_SERVER_ERROR", message: `${entity} insert did not return a valid database ID.` });
+    throw new TRPCError2({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `${entity} insert did not return a valid database ID.`
+    });
   }
   return id;
 }
 function requirePositiveInteger(value, entity) {
   if (!Number.isInteger(value) || value <= 0) {
-    throw new TRPCError2({ code: "INTERNAL_SERVER_ERROR", message: `${entity} ID is invalid.` });
+    throw new TRPCError2({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `${entity} ID is invalid.`
+    });
   }
   return value;
 }
@@ -600,8 +623,18 @@ function isDatabaseError(error) {
 }
 async function establishPasswordSession(ctx, userId) {
   const token = newSessionToken();
-  await createSession(userId, hashSessionToken(token), new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30));
-  setSessionCookie(ctx.res, ctx.req, COOKIE_NAME, token, 1e3 * 60 * 60 * 24 * 30);
+  await createSession(
+    userId,
+    hashSessionToken(token),
+    new Date(Date.now() + 1e3 * 60 * 60 * 24 * 30)
+  );
+  setSessionCookie(
+    ctx.res,
+    ctx.req,
+    COOKIE_NAME,
+    token,
+    1e3 * 60 * 60 * 24 * 30
+  );
 }
 function safeAuthError(error, message) {
   if (error instanceof TRPCError2) throw error;
@@ -628,35 +661,77 @@ async function generatePlan(prompt) {
 }
 var appRouter = router({
   system: router({
-    health: publicProcedure.query(() => ({ status: "ok", product: "Personal AI OS" }))
+    health: publicProcedure.query(() => ({
+      status: "ok",
+      product: "Personal AI OS"
+    }))
   }),
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-    signup: publicProcedure.input(z.object({ name: z.string().trim().min(2).max(120), email: z.string().email().max(320), password: z.string().min(10).max(200) })).mutation(async ({ ctx, input }) => {
+    signup: publicProcedure.input(
+      z.object({
+        name: z.string().trim().min(2).max(120),
+        email: z.string().email().max(320),
+        password: z.string().min(10).max(200)
+      })
+    ).mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+        if (!db)
+          throw new TRPCError2({
+            code: "PRECONDITION_FAILED",
+            message: "Database is not configured."
+          });
         const email = input.email.toLowerCase();
-        if (await getUserByEmail(email)) throw new TRPCError2({ code: "CONFLICT", message: "An account with that email already exists." });
-        const result = await db.insert(users).values({ openId: `local:${email}`, name: input.name, email, passwordHash: await hashPassword(input.password), loginMethod: "password" }).$returningId();
+        if (await getUserByEmail(email))
+          throw new TRPCError2({
+            code: "CONFLICT",
+            message: "An account with that email already exists."
+          });
+        const result = await db.insert(users).values({
+          openId: `local:${email}`,
+          name: input.name,
+          email,
+          passwordHash: await hashPassword(input.password),
+          loginMethod: "password"
+        }).$returningId();
         const userId = requireInsertedId(result, "User");
         await establishPasswordSession(ctx, userId);
         return { success: true };
       } catch (error) {
-        return safeAuthError(error, "We couldn't create your account right now. Please try again shortly.");
+        return safeAuthError(
+          error,
+          "We couldn't create your account right now. Please try again shortly."
+        );
       }
     }),
-    login: publicProcedure.input(z.object({ email: z.string().email().max(320), password: z.string().min(1).max(200) })).mutation(async ({ ctx, input }) => {
+    login: publicProcedure.input(
+      z.object({
+        email: z.string().email().max(320),
+        password: z.string().min(1).max(200)
+      })
+    ).mutation(async ({ ctx, input }) => {
       try {
         const user = await getUserByEmail(input.email.toLowerCase());
-        if (!user?.passwordHash || !await verifyPassword(input.password, user.passwordHash)) throw new TRPCError2({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+        if (!user?.passwordHash || !await verifyPassword(input.password, user.passwordHash))
+          throw new TRPCError2({
+            code: "UNAUTHORIZED",
+            message: "Invalid email or password."
+          });
         const db = await getDb();
-        if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+        if (!db)
+          throw new TRPCError2({
+            code: "PRECONDITION_FAILED",
+            message: "Database is not configured."
+          });
         await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq2(users.id, user.id));
         await establishPasswordSession(ctx, user.id);
         return { success: true };
       } catch (error) {
-        return safeAuthError(error, "We couldn't sign you in right now. Please try again shortly.");
+        return safeAuthError(
+          error,
+          "We couldn't sign you in right now. Please try again shortly."
+        );
       }
     }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
@@ -671,14 +746,27 @@ var appRouter = router({
     runWorkflow: protectedProcedure.input(z.object({ prompt: z.string().min(8).max(1200) })).mutation(async ({ ctx, input }) => {
       const userId = requirePositiveInteger(ctx.user.id, "User");
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured for this environment." });
-      await recordActivity({ userId, eventType: "workflow_started", title: "Understanding request", description: input.prompt, agent: "Planner Agent" });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured for this environment."
+        });
+      await recordActivity({
+        userId,
+        eventType: "workflow_started",
+        title: "Understanding request",
+        description: input.prompt,
+        agent: "Planner Agent"
+      });
       let plan;
       try {
         plan = await generatePlan(input.prompt);
       } catch (error) {
         console.error("[AI workflow] planner failed", error);
-        throw new TRPCError2({ code: "INTERNAL_SERVER_ERROR", message: "The Planner Agent could not run. Check the server AI configuration and try again." });
+        throw new TRPCError2({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "The Planner Agent could not run. Check the server AI configuration and try again."
+        });
       }
       const createdGoal = await db.insert(goals).values({
         userId,
@@ -691,36 +779,89 @@ var appRouter = router({
       const goalId = requireInsertedId(createdGoal, "Goal");
       const safeTasks = plan.tasks.slice(0, 8);
       if (safeTasks.length) {
-        await db.insert(tasks).values(safeTasks.map((task) => ({
-          userId,
-          goalId,
-          title: task.title,
-          description: task.description,
-          agent: task.agent.slice(0, 80),
-          priority: task.priority,
-          status: "todo"
-        })));
+        await db.insert(tasks).values(
+          safeTasks.map((task) => ({
+            userId,
+            goalId,
+            title: task.title,
+            description: task.description,
+            agent: task.agent.slice(0, 80),
+            priority: task.priority,
+            status: "todo"
+          }))
+        );
       }
-      await recordActivity({ userId, eventType: "plan_created", title: `Planner generated ${safeTasks.length} tasks`, description: plan.summary, agent: "Planner Agent" });
-      await recordActivity({ userId, eventType: "critic_approved", title: "Critic approved execution plan", description: plan.recommendation, agent: "Critic Agent" });
-      await recordActivity({ userId, eventType: "workflow_completed", title: "Workflow ready for execution", description: "Goal and dependent tasks are now in your workspace.", agent: "Task Agent" });
+      await recordActivity({
+        userId,
+        eventType: "plan_created",
+        title: `Planner generated ${safeTasks.length} tasks`,
+        description: plan.summary,
+        agent: "Planner Agent"
+      });
+      await recordActivity({
+        userId,
+        eventType: "critic_approved",
+        title: "Critic approved execution plan",
+        description: plan.recommendation,
+        agent: "Critic Agent"
+      });
+      await recordActivity({
+        userId,
+        eventType: "workflow_completed",
+        title: "Workflow ready for execution",
+        description: "Goal and dependent tasks are now in your workspace.",
+        agent: "Task Agent"
+      });
       return { goalId, plan, taskCount: safeTasks.length };
     }),
-    createGoal: protectedProcedure.input(z.object({ title: z.string().min(3).max(160), description: z.string().max(1e3).optional(), priority: prioritySchema })).mutation(async ({ ctx, input }) => {
+    createGoal: protectedProcedure.input(
+      z.object({
+        title: z.string().min(3).max(160),
+        description: z.string().max(1e3).optional(),
+        priority: prioritySchema
+      })
+    ).mutation(async ({ ctx, input }) => {
       const userId = requirePositiveInteger(ctx.user.id, "User");
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const result = await db.insert(goals).values({ userId, ...input }).$returningId();
       const goalId = requireInsertedId(result, "Goal");
-      await recordActivity({ userId, eventType: "goal_created", title: "Goal created", description: input.title, agent: "Task Agent" });
+      await recordActivity({
+        userId,
+        eventType: "goal_created",
+        title: "Goal created",
+        description: input.title,
+        agent: "Task Agent"
+      });
       return { id: goalId };
     }),
-    updateGoal: protectedProcedure.input(z.object({ id: z.number().int().positive(), title: z.string().min(3).max(160).optional(), description: z.string().max(1e3).nullable().optional(), priority: prioritySchema.optional(), status: z.enum(["active", "completed", "paused"]).optional(), deadline: z.coerce.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+    updateGoal: protectedProcedure.input(
+      z.object({
+        id: z.number().int().positive(),
+        title: z.string().min(3).max(160).optional(),
+        description: z.string().max(1e3).nullable().optional(),
+        priority: prioritySchema.optional(),
+        status: z.enum(["active", "completed", "paused"]).optional(),
+        deadline: z.coerce.date().nullable().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const { id, ...changes } = input;
       const owned = await db.select({ id: goals.id }).from(goals).where(and2(eq2(goals.id, id), eq2(goals.userId, ctx.user.id))).limit(1);
-      if (!owned[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Goal not found." });
+      if (!owned[0])
+        throw new TRPCError2({
+          code: "NOT_FOUND",
+          message: "Goal not found."
+        });
       await db.update(goals).set(changes).where(and2(eq2(goals.id, id), eq2(goals.userId, ctx.user.id)));
       return { success: true };
     }),
@@ -728,55 +869,134 @@ var appRouter = router({
       const db = await getDb();
       return db ? db.select().from(goals).where(eq2(goals.userId, ctx.user.id)).orderBy(desc2(goals.updatedAt)) : [];
     }),
-    createTask: protectedProcedure.input(z.object({ goalId: z.number().int().positive().nullable().optional(), title: z.string().min(3).max(200), description: z.string().max(1200).nullable().optional(), priority: prioritySchema, agent: z.string().max(80).optional(), dueDate: z.coerce.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+    createTask: protectedProcedure.input(
+      z.object({
+        goalId: z.number().int().positive().nullable().optional(),
+        title: z.string().min(3).max(200),
+        description: z.string().max(1200).nullable().optional(),
+        priority: prioritySchema,
+        agent: z.string().max(80).optional(),
+        dueDate: z.coerce.date().nullable().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       if (input.goalId) {
-        const owned = await db.select({ id: goals.id }).from(goals).where(and2(eq2(goals.id, input.goalId), eq2(goals.userId, ctx.user.id))).limit(1);
-        if (!owned[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Goal not found." });
+        const owned = await db.select({ id: goals.id }).from(goals).where(
+          and2(eq2(goals.id, input.goalId), eq2(goals.userId, ctx.user.id))
+        ).limit(1);
+        if (!owned[0])
+          throw new TRPCError2({
+            code: "NOT_FOUND",
+            message: "Goal not found."
+          });
       }
-      const result = await db.insert(tasks).values({ userId: ctx.user.id, ...input, agent: input.agent ?? "Task Agent" }).$returningId();
+      const result = await db.insert(tasks).values({
+        userId: ctx.user.id,
+        ...input,
+        agent: input.agent ?? "Task Agent"
+      }).$returningId();
       return { id: requireInsertedId(result, "Task") };
     }),
-    updateTask: protectedProcedure.input(z.object({ id: z.number().int().positive(), goalId: z.number().int().positive().nullable().optional(), title: z.string().min(3).max(200).optional(), description: z.string().max(1200).nullable().optional(), priority: prioritySchema.optional(), agent: z.string().max(80).optional(), status: z.enum(["todo", "in_progress", "completed", "failed"]).optional(), dueDate: z.coerce.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+    updateTask: protectedProcedure.input(
+      z.object({
+        id: z.number().int().positive(),
+        goalId: z.number().int().positive().nullable().optional(),
+        title: z.string().min(3).max(200).optional(),
+        description: z.string().max(1200).nullable().optional(),
+        priority: prioritySchema.optional(),
+        agent: z.string().max(80).optional(),
+        status: z.enum(["todo", "in_progress", "completed", "failed"]).optional(),
+        dueDate: z.coerce.date().nullable().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const { id, ...changes } = input;
       const found = await db.select().from(tasks).where(and2(eq2(tasks.id, id), eq2(tasks.userId, ctx.user.id))).limit(1);
-      if (!found[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Task not found." });
+      if (!found[0])
+        throw new TRPCError2({
+          code: "NOT_FOUND",
+          message: "Task not found."
+        });
       if (changes.goalId) {
-        const owned = await db.select({ id: goals.id }).from(goals).where(and2(eq2(goals.id, changes.goalId), eq2(goals.userId, ctx.user.id))).limit(1);
-        if (!owned[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Goal not found." });
+        const owned = await db.select({ id: goals.id }).from(goals).where(
+          and2(eq2(goals.id, changes.goalId), eq2(goals.userId, ctx.user.id))
+        ).limit(1);
+        if (!owned[0])
+          throw new TRPCError2({
+            code: "NOT_FOUND",
+            message: "Goal not found."
+          });
       }
       await db.update(tasks).set(changes).where(and2(eq2(tasks.id, id), eq2(tasks.userId, ctx.user.id)));
-      if (found[0].goalId) await updateGoalProgress(ctx.user.id, found[0].goalId);
-      if (changes.goalId && changes.goalId !== found[0].goalId) await updateGoalProgress(ctx.user.id, changes.goalId);
+      if (found[0].goalId)
+        await updateGoalProgress(ctx.user.id, found[0].goalId);
+      if (changes.goalId && changes.goalId !== found[0].goalId)
+        await updateGoalProgress(ctx.user.id, changes.goalId);
       return { success: true };
     }),
     deleteTask: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const found = await db.select().from(tasks).where(and2(eq2(tasks.id, input.id), eq2(tasks.userId, ctx.user.id))).limit(1);
-      if (!found[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Task not found." });
+      if (!found[0])
+        throw new TRPCError2({
+          code: "NOT_FOUND",
+          message: "Task not found."
+        });
       await db.delete(tasks).where(and2(eq2(tasks.id, input.id), eq2(tasks.userId, ctx.user.id)));
-      if (found[0].goalId) await updateGoalProgress(ctx.user.id, found[0].goalId);
+      if (found[0].goalId)
+        await updateGoalProgress(ctx.user.id, found[0].goalId);
       return { success: true };
     }),
     toggleTask: protectedProcedure.input(z.object({ id: z.number(), completed: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const found = await db.select().from(tasks).where(and2(eq2(tasks.id, input.id), eq2(tasks.userId, ctx.user.id))).limit(1);
       const task = found[0];
-      if (!task) throw new TRPCError2({ code: "NOT_FOUND", message: "Task not found." });
+      if (!task)
+        throw new TRPCError2({
+          code: "NOT_FOUND",
+          message: "Task not found."
+        });
       await db.update(tasks).set({ status: input.completed ? "completed" : "todo" }).where(and2(eq2(tasks.id, input.id), eq2(tasks.userId, ctx.user.id)));
       if (task.goalId) await updateGoalProgress(ctx.user.id, task.goalId);
-      await recordActivity({ userId: ctx.user.id, eventType: input.completed ? "task_completed" : "task_reopened", title: input.completed ? "Task completed" : "Task reopened", description: task.title, agent: task.agent });
+      await recordActivity({
+        userId: ctx.user.id,
+        eventType: input.completed ? "task_completed" : "task_reopened",
+        title: input.completed ? "Task completed" : "Task reopened",
+        description: task.title,
+        agent: task.agent
+      });
       return { success: true };
     }),
     deleteGoal: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
-      await db.delete(tasks).where(and2(eq2(tasks.goalId, input.id), eq2(tasks.userId, ctx.user.id)));
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
+      await db.delete(tasks).where(
+        and2(eq2(tasks.goalId, input.id), eq2(tasks.userId, ctx.user.id))
+      );
       await db.delete(goals).where(and2(eq2(goals.id, input.id), eq2(goals.userId, ctx.user.id)));
       return { success: true };
     })
@@ -787,50 +1007,158 @@ var appRouter = router({
       if (!db) return [];
       return db.select().from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.updatedAt));
     }),
-    create: protectedProcedure.input(z.object({ category: z.string().min(2).max(48), content: z.string().min(3).max(600), importance: z.number().min(0).max(100) })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(
+      z.object({
+        category: z.string().min(2).max(48),
+        content: z.string().min(3).max(600),
+        importance: z.number().min(0).max(100)
+      })
+    ).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       const result = await db.insert(memories).values({ userId: ctx.user.id, ...input }).$returningId();
-      await recordActivity({ userId: ctx.user.id, eventType: "memory_saved", title: "Memory saved", description: input.content, agent: "Memory Agent" });
+      await recordActivity({
+        userId: ctx.user.id,
+        eventType: "memory_saved",
+        title: "Memory saved",
+        description: input.content,
+        agent: "Memory Agent"
+      });
       return { id: requireInsertedId(result, "Memory") };
     })
   }),
   chat: router({
-    history: protectedProcedure.input(z.object({ conversationId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+    history: protectedProcedure.input(
+      z.object({ conversationId: z.number().int().positive().optional() }).optional()
+    ).query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return { conversation: null, messages: [] };
-      const conversation = input?.conversationId ? (await db.select().from(conversations).where(and2(eq2(conversations.id, input.conversationId), eq2(conversations.userId, ctx.user.id))).limit(1))[0] : (await db.select().from(conversations).where(eq2(conversations.userId, ctx.user.id)).orderBy(desc2(conversations.updatedAt)).limit(1))[0];
+      const conversation = input?.conversationId ? (await db.select().from(conversations).where(
+        and2(
+          eq2(conversations.id, input.conversationId),
+          eq2(conversations.userId, ctx.user.id)
+        )
+      ).limit(1))[0] : (await db.select().from(conversations).where(eq2(conversations.userId, ctx.user.id)).orderBy(desc2(conversations.updatedAt)).limit(1))[0];
       if (!conversation) return { conversation: null, messages: [] };
-      return { conversation, messages: await db.select().from(messages).where(and2(eq2(messages.conversationId, conversation.id), eq2(messages.userId, ctx.user.id))).orderBy(messages.createdAt) };
+      return {
+        conversation,
+        messages: await db.select().from(messages).where(
+          and2(
+            eq2(messages.conversationId, conversation.id),
+            eq2(messages.userId, ctx.user.id)
+          )
+        ).orderBy(messages.createdAt)
+      };
     }),
-    send: protectedProcedure.input(z.object({ conversationId: z.number().int().positive().optional(), content: z.string().trim().min(1).max(4e3) })).mutation(async ({ ctx, input }) => {
+    send: protectedProcedure.input(
+      z.object({
+        conversationId: z.number().int().positive().optional(),
+        content: z.string().trim().min(1).max(4e3)
+      })
+    ).mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError2({ code: "PRECONDITION_FAILED", message: "Database is not configured." });
+      if (!db)
+        throw new TRPCError2({
+          code: "PRECONDITION_FAILED",
+          message: "Database is not configured."
+        });
       let conversationId = input.conversationId;
       if (conversationId) {
-        const owned = await db.select({ id: conversations.id }).from(conversations).where(and2(eq2(conversations.id, conversationId), eq2(conversations.userId, ctx.user.id))).limit(1);
-        if (!owned[0]) throw new TRPCError2({ code: "NOT_FOUND", message: "Conversation not found." });
+        const owned = await db.select({ id: conversations.id }).from(conversations).where(
+          and2(
+            eq2(conversations.id, conversationId),
+            eq2(conversations.userId, ctx.user.id)
+          )
+        ).limit(1);
+        if (!owned[0])
+          throw new TRPCError2({
+            code: "NOT_FOUND",
+            message: "Conversation not found."
+          });
       } else {
-        conversationId = requireInsertedId(await db.insert(conversations).values({ userId: ctx.user.id, title: input.content.slice(0, 80) }).$returningId(), "Conversation");
+        conversationId = requireInsertedId(
+          await db.insert(conversations).values({
+            userId: ctx.user.id,
+            title: input.content.slice(0, 80)
+          }).$returningId(),
+          "Conversation"
+        );
       }
-      await db.insert(messages).values({ conversationId, userId: ctx.user.id, role: "user", content: input.content });
+      await db.insert(messages).values({
+        conversationId,
+        userId: ctx.user.id,
+        role: "user",
+        content: input.content
+      });
       const explicitMemory = extractExplicitMemory(input.content);
       if (explicitMemory) {
-        await db.insert(memories).values({ userId: ctx.user.id, category: "Explicit memory", content: explicitMemory, importance: 90 });
-        await recordActivity({ userId: ctx.user.id, eventType: "memory_saved", title: "Memory saved from chat", description: explicitMemory, agent: "Memory Agent" });
+        await db.insert(memories).values({
+          userId: ctx.user.id,
+          category: "Explicit memory",
+          content: explicitMemory,
+          importance: 90
+        });
+        await recordActivity({
+          userId: ctx.user.id,
+          eventType: "memory_saved",
+          title: "Memory saved from chat",
+          description: explicitMemory,
+          agent: "Memory Agent"
+        });
       }
-      const storedMemories = await db.select({ content: memories.content, category: memories.category, importance: memories.importance }).from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.updatedAt)).limit(50);
-      const relevantMemories = selectRelevantMemories(storedMemories, input.content);
-      const memoryContext = relevantMemories.length ? "\n\nRelevant private memories (use them when helpful, never invent beyond them):\n" + relevantMemories.map((memory) => "- [" + memory.category + "] " + memory.content).join("\n") : "";
-      let answer = explicitMemory ? "I\u2019ll remember that: " + explicitMemory : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
-      try {
-        const response = await invokeLLM({ messages: [{ role: "system", content: "You are the Personal AI OS assistant. Give concise, actionable answers. Use Markdown for structure (headings, lists, tables, and code when useful). Never claim to have taken sensitive external actions without approval." + memoryContext }, { role: "user", content: input.content }], maxTokens: 700 });
-        answer = readLLMText(response.choices[0]?.message?.content) || answer;
-      } catch (error) {
-        console.warn("[chat] AI response unavailable", error);
+      const storedMemories = await db.select({
+        content: memories.content,
+        category: memories.category,
+        importance: memories.importance
+      }).from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.updatedAt)).limit(50);
+      const relevantMemories = selectRelevantMemories(
+        storedMemories,
+        input.content
+      );
+      const memoriesForPrompt = relevantMemories.length ? relevantMemories : storedMemories.slice(0, 8);
+      const memoryContext = memoriesForPrompt.length ? "\n\nRelevant private memories (use these as the source of truth when the user asks about their preferences, goals, or remembered facts; never invent beyond them):\n" + memoriesForPrompt.map((memory) => "- [" + memory.category + "] " + memory.content).join("\n") : "";
+      const isMemoryRecall = !explicitMemory && relevantMemories.length > 0 && /\b(what|which|do you remember|remember)\b/i.test(input.content);
+      let answer = explicitMemory ? "I\u2019ll remember that: " + explicitMemory : isMemoryRecall ? "I remember: " + relevantMemories.map((memory) => memory.content).join("; ") : "I saved that in your private workspace. Configure the server AI gateway to enable a generated response.";
+      if (!isMemoryRecall) {
+        try {
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: "You are the Personal AI OS assistant. Give concise, actionable answers. Use Markdown for structure (headings, lists, tables, and code when useful). Never claim to have taken sensitive external actions without approval." + memoryContext
+              },
+              { role: "user", content: input.content }
+            ],
+            maxTokens: 700
+          });
+          answer = readLLMText(response.choices[0]?.message?.content) || answer;
+        } catch (error) {
+          console.warn("[chat] AI response unavailable", error);
+        }
       }
-      await db.insert(messages).values({ conversationId, userId: ctx.user.id, role: "assistant", content: answer });
-      await recordActivity({ userId: ctx.user.id, eventType: "chat_completed", title: "Assistant replied", description: input.content.slice(0, 180), agent: "Communication Agent" });
+      await db.insert(messages).values({
+        conversationId,
+        userId: ctx.user.id,
+        role: "assistant",
+        content: answer
+      });
+      await db.update(conversations).set({ updatedAt: /* @__PURE__ */ new Date() }).where(
+        and2(
+          eq2(conversations.id, conversationId),
+          eq2(conversations.userId, ctx.user.id)
+        )
+      );
+      await recordActivity({
+        userId: ctx.user.id,
+        eventType: "chat_completed",
+        title: "Assistant replied",
+        description: input.content.slice(0, 180),
+        agent: "Communication Agent"
+      });
       return { conversationId, answer };
     })
   }),
@@ -844,8 +1172,23 @@ var appRouter = router({
   history: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) return { conversations: [], messages: [], activity: [], goals: [], tasks: [], memories: [] };
-      const [userConversations, userMessages, userActivity, userGoals, userTasks, userMemories] = await Promise.all([
+      if (!db)
+        return {
+          conversations: [],
+          messages: [],
+          activity: [],
+          goals: [],
+          tasks: [],
+          memories: []
+        };
+      const [
+        userConversations,
+        userMessages,
+        userActivity,
+        userGoals,
+        userTasks,
+        userMemories
+      ] = await Promise.all([
         db.select().from(conversations).where(eq2(conversations.userId, ctx.user.id)).orderBy(desc2(conversations.updatedAt)),
         db.select().from(messages).where(eq2(messages.userId, ctx.user.id)).orderBy(desc2(messages.createdAt)).limit(100),
         db.select().from(activityEvents).where(eq2(activityEvents.userId, ctx.user.id)).orderBy(desc2(activityEvents.createdAt)).limit(100),
@@ -853,7 +1196,14 @@ var appRouter = router({
         db.select().from(tasks).where(eq2(tasks.userId, ctx.user.id)).orderBy(desc2(tasks.createdAt)),
         db.select().from(memories).where(eq2(memories.userId, ctx.user.id)).orderBy(desc2(memories.createdAt))
       ]);
-      return { conversations: userConversations, messages: userMessages, activity: userActivity, goals: userGoals, tasks: userTasks, memories: userMemories };
+      return {
+        conversations: userConversations,
+        messages: userMessages,
+        activity: userActivity,
+        goals: userGoals,
+        tasks: userTasks,
+        memories: userMemories
+      };
     })
   })
 });
