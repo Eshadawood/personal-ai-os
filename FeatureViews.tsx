@@ -960,6 +960,18 @@ export function PrivacySettingsView({ onLogout }: { onLogout: () => void }) {
           </button>
         </div>
       </section>
+      <section className={panel}>
+        <h3 className="mb-2 text-sm font-semibold">Session</h3>
+        <p className="text-xs text-slate-400">
+          Sign out of this browser without changing your workspace data.
+        </p>
+        <button
+          className="mt-3 rounded-xl border border-white/10 px-4 py-2.5 text-xs text-slate-200"
+          onClick={onLogout}
+        >
+          Sign out
+        </button>
+      </section>
     </div>
   );
 }

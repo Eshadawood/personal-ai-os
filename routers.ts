@@ -1308,7 +1308,11 @@ export const appRouter = router({
             const mammoth = (await import("mammoth")).default;
             content = (await mammoth.extractRawText({ buffer: bytes })).value;
           }
-        } catch {
+        } catch (error) {
+          console.error(
+            "[documents] extraction failed",
+            error instanceof Error ? error.stack : error,
+          );
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Could not extract text from this document.",
