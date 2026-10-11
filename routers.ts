@@ -33,6 +33,7 @@ import { parse } from "cookie";
 import { users, sessions } from "./drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import { clearSessionCookie, setSessionCookie } from "./_core/cookies";
+import { extractPdfText } from "./server/pdf";
 
 const prioritySchema = z.enum(["low", "medium", "high"]);
 
@@ -1302,8 +1303,7 @@ export const appRouter = router({
         try {
           if (input.mimeType === "text/plain") content = bytes.toString("utf8");
           else if (input.mimeType === "application/pdf") {
-            const parsePdf = (await import("pdf-parse")).default;
-            content = (await parsePdf(bytes)).text;
+            content = await extractPdfText(bytes);
           } else {
             const mammoth = (await import("mammoth")).default;
             content = (await mammoth.extractRawText({ buffer: bytes })).value;

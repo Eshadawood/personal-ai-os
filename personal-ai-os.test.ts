@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { hashPassword, verifyPassword, hashSessionToken } from "./auth";
+import { extractPdfText } from "./server/pdf";
 
 function createContext(user: TrpcContext["user"] = null): TrpcContext {
   return {
@@ -12,6 +13,32 @@ function createContext(user: TrpcContext["user"] = null): TrpcContext {
 }
 
 describe("Personal AI OS contracts", () => {
+  it("extracts text from a standard PDF with PDF.js", async () => {
+    const objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      "<< /Length 44 >>\nstream\nBT /F1 18 Tf 72 720 Td (PDF.js migration works) Tj ET\nendstream",
+    ];
+    let source = "%PDF-1.4\n";
+    const offsets = [0];
+    for (let index = 0; index < objects.length; index += 1) {
+      offsets.push(Buffer.byteLength(source));
+      source += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+    }
+    const xrefOffset = Buffer.byteLength(source);
+    source += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let index = 1; index < offsets.length; index += 1) {
+      source += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+    }
+    source += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
+    await expect(extractPdfText(Buffer.from(source))).resolves.toContain(
+      "PDF.js migration works",
+    );
+  });
+
   it("reports a healthy public system status", async () => {
     const result = await appRouter
       .createCaller(createContext())

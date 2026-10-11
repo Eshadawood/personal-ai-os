@@ -622,6 +622,32 @@ function clearSessionCookie(res, req, name) {
   res.append("Set-Cookie", serialize(name, "", { ...getSessionCookieOptions(req), maxAge: 0 }));
 }
 
+// server/pdf.ts
+async function extractPdfText(bytes) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(bytes),
+    isEvalSupported: false,
+    useSystemFonts: true
+  });
+  const document = await loadingTask.promise;
+  const pages = [];
+  try {
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      pages.push(
+        textContent.items.map((item) => "str" in item ? item.str : "").filter(Boolean).join(" ")
+      );
+      page.cleanup();
+    }
+  } finally {
+    await document.cleanup();
+    await document.destroy();
+  }
+  return pages.join("\n").replace(/\s+/g, " ").trim();
+}
+
 // routers.ts
 var prioritySchema = z.enum(["low", "medium", "high"]);
 var planSchema = {
@@ -1568,8 +1594,7 @@ var appRouter = router({
       try {
         if (input.mimeType === "text/plain") content = bytes.toString("utf8");
         else if (input.mimeType === "application/pdf") {
-          const parsePdf = (await import("pdf-parse")).default;
-          content = (await parsePdf(bytes)).text;
+          content = await extractPdfText(bytes);
         } else {
           const mammoth = (await import("mammoth")).default;
           content = (await mammoth.extractRawText({ buffer: bytes })).value;
