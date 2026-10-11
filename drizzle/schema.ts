@@ -1,4 +1,12 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mediumtext,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -22,19 +30,123 @@ export const sessions = mysqlTable("sessions", {
 });
 
 export const goals = mysqlTable("goals", {
-  id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), title: text("title").notNull(), description: text("description"),
-  status: mysqlEnum("status", ["active", "completed", "paused"]).default("active").notNull(), priority: mysqlEnum("priority", ["low", "medium", "high"]).default("medium").notNull(), progress: int("progress").default(0).notNull(), deadline: timestamp("deadline"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["active", "completed", "paused"])
+    .default("active")
+    .notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high"])
+    .default("medium")
+    .notNull(),
+  progress: int("progress").default(0).notNull(),
+  deadline: timestamp("deadline"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export const tasks = mysqlTable("tasks", {
-  id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), goalId: int("goalId"), title: text("title").notNull(), description: text("description"),
-  status: mysqlEnum("status", ["todo", "in_progress", "completed", "failed"]).default("todo").notNull(), priority: mysqlEnum("priority", ["low", "medium", "high"]).default("medium").notNull(), agent: varchar("agent", { length: 80 }).default("Task Agent").notNull(), dueDate: timestamp("dueDate"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  goalId: int("goalId"),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["todo", "in_progress", "completed", "failed"])
+    .default("todo")
+    .notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high"])
+    .default("medium")
+    .notNull(),
+  agent: varchar("agent", { length: 80 }).default("Task Agent").notNull(),
+  dueDate: timestamp("dueDate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const memories = mysqlTable("memories", { id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), category: varchar("category", { length: 48 }).notNull(), content: text("content").notNull(), importance: int("importance").default(70).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() });
-export const activityEvents = mysqlTable("activityEvents", { id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), eventType: varchar("eventType", { length: 48 }).notNull(), title: text("title").notNull(), description: text("description"), agent: varchar("agent", { length: 80 }), createdAt: timestamp("createdAt").defaultNow().notNull() });
-export const conversations = mysqlTable("conversations", { id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), title: text("title").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull() });
-export const messages = mysqlTable("messages", { id: int("id").autoincrement().primaryKey(), conversationId: int("conversationId").notNull(), userId: int("userId").notNull(), role: mysqlEnum("role", ["user", "assistant", "system"]).notNull(), content: text("content").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() });
+export const memories = mysqlTable("memories", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  category: varchar("category", { length: 48 }).notNull(),
+  content: text("content").notNull(),
+  importance: int("importance").default(70).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const calendarEvents = mysqlTable("calendarEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt"),
+  allDay: int("allDay").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const reminders = mysqlTable("reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: text("title").notNull(),
+  dueAt: timestamp("dueAt").notNull(),
+  recurrence: mysqlEnum("recurrence", ["none", "daily", "weekly", "monthly"])
+    .default("none")
+    .notNull(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export const documents = mysqlTable("documents", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 120 }).notNull(),
+  content: mediumtext("content").notNull(),
+  summary: text("summary"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const productivitySummaries = mysqlTable("productivitySummaries", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  weekOf: timestamp("weekOf").notNull(),
+  summary: text("summary").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export const sentEmails = mysqlTable("sentEmails", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  recipient: varchar("recipient", { length: 320 }).notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  providerId: varchar("providerId", { length: 255 }),
+  status: mysqlEnum("status", ["sent", "failed"]).notNull(),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export const activityEvents = mysqlTable("activityEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  eventType: varchar("eventType", { length: 48 }).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  agent: varchar("agent", { length: 80 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: text("title").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull(),
+  userId: int("userId").notNull(),
+  role: mysqlEnum("role", ["user", "assistant", "system"]).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

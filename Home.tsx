@@ -1,5 +1,14 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import {
+  CalendarView,
+  DocumentsView,
+  EmailAssistantView,
+  GlobalSearchView,
+  InsightsView,
+  PrivacySettingsView,
+  DashboardSignals,
+} from "./FeatureViews";
 import { Streamdown } from "streamdown";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
@@ -42,7 +51,11 @@ type PageKey =
   | "agents"
   | "activity"
   | "tools"
-  | "settings";
+  | "settings"
+  | "calendar"
+  | "email"
+  | "search"
+  | "insights";
 type Goal = {
   id: number;
   title: string;
@@ -85,6 +98,7 @@ const navGroups = [
     items: [
       ["memory", "Memory", BrainCircuit],
       ["files", "Files", FileText],
+      ["search", "Search", Search],
     ],
   },
   {
@@ -93,6 +107,9 @@ const navGroups = [
       ["agents", "Agents", Network],
       ["activity", "Activity", Activity],
       ["tools", "Tools", TerminalSquare],
+      ["calendar", "Calendar", Clock3],
+      ["insights", "Insights", Sparkles],
+      ["email", "Email", MessageCircle],
     ],
   },
 ] as const;
@@ -245,6 +262,11 @@ export default function Home() {
   }
   const view = useMemo(() => {
     if (page === "chat") return <ChatView />;
+    if (page === "calendar") return <CalendarView />;
+    if (page === "email") return <EmailAssistantView />;
+    if (page === "search") return <GlobalSearchView />;
+    if (page === "insights") return <InsightsView />;
+    if (page === "files") return <DocumentsView />;
     if (page === "goals")
       return <GoalsView goals={goals} onCreate={() => setGoalOpen(true)} />;
     if (page === "tasks")
@@ -266,14 +288,13 @@ export default function Home() {
     if (page === "activity") return <ActivityView events={events} />;
     if (page === "settings")
       return (
-        <SettingsView
-          name={user?.name || "Workspace"}
+        <PrivacySettingsView
           onLogout={() => {
             void logout().finally(() => setLocation("/login"));
           }}
         />
       );
-    if (["files", "agents", "tools"].includes(page))
+    if (["agents", "tools"].includes(page))
       return <PlaceholderView page={page} />;
     return (
       <OverviewView
@@ -567,6 +588,7 @@ function OverviewView({
 }) {
   return (
     <div className="space-y-8">
+      <DashboardSignals />
       <div>
         <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-lime-300/80">
           System online
@@ -912,6 +934,14 @@ function MemoryView() {
   });
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
+  const updateMemory = trpc.memory.update.useMutation({
+    onSuccess: () => query.refetch(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteMemory = trpc.memory.delete.useMutation({
+    onSuccess: () => query.refetch(),
+    onError: (e) => toast.error(e.message),
+  });
   return (
     <div>
       <SectionHeader
@@ -985,9 +1015,38 @@ function MemoryView() {
                   />
                 </div>
               </div>
-              <div className="mt-5 flex items-center gap-2 border-t border-white/[0.07] pt-4 text-[11px] text-slate-600">
-                <Lock className="h-3 w-3" />
-                Private to your workspace
+              <div className="mt-5 flex items-center justify-between gap-2 border-t border-white/[0.07] pt-4 text-[11px] text-slate-600">
+                <span className="flex items-center gap-2">
+                  <Lock className="h-3 w-3" />
+                  Private to your workspace
+                </span>
+                <span className="flex gap-3">
+                  <button
+                    className="text-cyan-300"
+                    onClick={() => {
+                      const next = window.prompt(
+                        "Edit this memory",
+                        memory.content,
+                      );
+                      if (next?.trim())
+                        updateMemory.mutate({
+                          id: memory.id,
+                          content: next.trim(),
+                        });
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-rose-300"
+                    onClick={() => {
+                      if (window.confirm("Delete this saved memory?"))
+                        deleteMemory.mutate({ id: memory.id });
+                    }}
+                  >
+                    Delete
+                  </button>
+                </span>
               </div>
             </div>
           ))}
@@ -997,26 +1056,95 @@ function MemoryView() {
   );
 }
 function ChatView() {
-  const history = trpc.chat.history.useQuery(undefined, { retry: false });
+  const [activeId, setActiveId] = useState<number | undefined>(undefined);
+  const list = trpc.chat.list.useQuery();
+  const history = trpc.chat.history.useQuery(
+    activeId ? { conversationId: activeId } : undefined,
+    { retry: false },
+  );
+  const utils = trpc.useUtils();
+  const create = trpc.chat.new.useMutation({
+    onSuccess: (r) => {
+      setActiveId(r.id);
+      void list.refetch();
+      void utils.chat.history.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const send = trpc.chat.send.useMutation({
-    onSuccess: () => {
+    onSuccess: (r) => {
       setDraft("");
-      history.refetch();
+      setActiveId(r.conversationId);
+      void history.refetch();
+      void list.refetch();
     },
     onError: (e) => toast.error(e.message),
   });
   const [draft, setDraft] = useState("");
   const messages = history.data?.messages || [];
+  function startVoice() {
+    const Ctor =
+      (
+        window as Window & {
+          webkitSpeechRecognition?: new () => any;
+          SpeechRecognition?: new () => any;
+        }
+      ).SpeechRecognition ||
+      (window as Window & { webkitSpeechRecognition?: new () => any })
+        .webkitSpeechRecognition;
+    if (!Ctor) {
+      toast.error("Voice input is not supported in this browser.");
+      return;
+    }
+    const recognition = new Ctor();
+    recognition.lang = navigator.language;
+    recognition.onresult = (e: any) =>
+      setDraft((v) => v + e.results[0][0].transcript);
+    recognition.start();
+  }
+  function speak(text: string) {
+    if (!("speechSynthesis" in window)) {
+      toast.error("Voice playback is not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  }
   return (
-    <div className="mx-auto max-w-4xl">
-      <SectionHeader
-        eyebrow="Communication / assistant"
-        title="Chat"
-        detail="Markdown responses, persisted conversations, and relevant private memory."
-      />
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+            Communication / assistant
+          </p>
+          <h2 className="text-xl font-semibold text-white">Chat</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Markdown replies, private memory retrieval, and separate saved
+            conversations.
+          </p>
+        </div>
+        <button
+          onClick={() => create.mutate()}
+          disabled={create.isPending}
+          className="rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-bold text-slate-950"
+        >
+          ＋ New Chat
+        </button>
+      </div>
+      <div className="mb-4 flex gap-2 overflow-x-auto">
+        {(list.data || []).map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setActiveId(c.id)}
+            className={`max-w-48 truncate rounded-lg border px-3 py-2 text-xs ${activeId === c.id ? "border-cyan-300/40 text-cyan-200" : "border-white/10 text-slate-400"}`}
+          >
+            {c.title || "New chat"}
+          </button>
+        ))}
+      </div>
       <div className="min-h-[420px] space-y-5 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7">
         {messages.length === 0 && (
-          <Empty text="Start a conversation. Try: Remember that my main goal is to learn Python." />
+          <Empty text="Start a conversation. Try: Remember that my main goal is to learn Python, create task: read chapter 1, or create goal: run a half marathon." />
         )}
         {messages.map((message) => (
           <div
@@ -1024,11 +1152,17 @@ function ChatView() {
             className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-black/20 text-slate-200"}`}
+              className={`group max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-cyan-300 text-slate-950" : "border border-white/[0.08] bg-black/20 text-slate-200"}`}
             >
               {message.role === "assistant" ? (
                 <div className="markdown-content">
                   <Streamdown mode="static">{message.content}</Streamdown>
+                  <button
+                    onClick={() => speak(message.content)}
+                    className="mt-2 text-[10px] text-cyan-300"
+                  >
+                    Read aloud
+                  </button>
                 </div>
               ) : (
                 message.content
@@ -1042,12 +1176,20 @@ function ChatView() {
           e.preventDefault();
           if (draft.trim())
             send.mutate({
-              conversationId: history.data?.conversation?.id,
+              conversationId: activeId || history.data?.conversation?.id,
               content: draft.trim(),
             });
         }}
-        className="mt-4 flex gap-3"
+        className="mt-4 flex gap-2"
       >
+        <button
+          type="button"
+          onClick={startVoice}
+          className="rounded-xl border border-white/10 px-3 text-xs text-slate-300"
+          aria-label="Voice input"
+        >
+          Voice
+        </button>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -1330,10 +1472,12 @@ function GoalModal({
     title: string;
     description?: string;
     priority: "low" | "medium" | "high";
+    deadline?: Date | null;
   }) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   return (
     <Modal title="Create goal" onClose={onClose}>
@@ -1350,6 +1494,15 @@ function GoalModal({
         placeholder="Description (optional)"
         className="field min-h-24"
       />
+      <label className="block text-xs text-slate-400">
+        Deadline (optional)
+        <input
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          className="field mt-1"
+        />
+      </label>
       <select
         value={priority}
         onChange={(e) => setPriority(e.target.value as typeof priority)}
@@ -1366,6 +1519,7 @@ function GoalModal({
             title: title.trim(),
             description: description.trim() || undefined,
             priority,
+            deadline: deadline ? new Date(`${deadline}T23:59:59`) : null,
           })
         }
         className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40"
@@ -1389,10 +1543,12 @@ function TaskModal({
     description?: string;
     priority: "low" | "medium" | "high";
     goalId?: number | null;
+    dueDate?: Date | null;
   }) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [goalId, setGoalId] = useState("");
   return (
@@ -1433,6 +1589,15 @@ function TaskModal({
           ))}
         </select>
       </div>
+      <label className="block text-xs text-slate-400">
+        Due date (optional)
+        <input
+          type="datetime-local"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="field mt-1"
+        />
+      </label>
       <button
         disabled={pending || title.trim().length < 3}
         onClick={() =>
@@ -1441,6 +1606,7 @@ function TaskModal({
             description: description.trim() || undefined,
             priority,
             goalId: goalId ? Number(goalId) : null,
+            dueDate: dueDate ? new Date(dueDate) : null,
           })
         }
         className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-40"

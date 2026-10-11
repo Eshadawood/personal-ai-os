@@ -180,3 +180,10 @@ The project currently passes:
 ## Next improvements
 
 The next product increment should add real file upload metadata and parsing, Chroma-backed retrieval, embeddings, research-source citations, approval records, conversation history UI, and a more complete LangGraph-equivalent execution graph. Those capabilities should be added incrementally without weakening the current user isolation and approval boundaries.
+
+
+## Current production features
+
+This continuation adds persistent calendar events and recurring reminders; editable, searchable memories; DOCX/PDF/TXT extraction with summaries; cross-workspace search; goal analytics and AI task suggestions; persisted weekly summaries; account export/password/session/history controls; and an Email Assistant that sends only after explicit user action. Run `pnpm db:migrate` before serving the new endpoints; migration `drizzle/0003_personal_os_features.sql` creates only the new feature tables.
+
+For email, configure `RESEND_API_KEY` and `RESEND_FROM` as **server-side deployment secrets** (never `VITE_` variables). The sender address/domain must be verified with Resend. Delivery calls Resend's API and records the provider response; if either setting is missing, sending fails with an explicit configuration error. Document uploads support PDF, DOCX, and TXT up to 6 MB each; extracted text is retained in the user's database for search and export.

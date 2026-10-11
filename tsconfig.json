@@ -18,6 +18,6 @@
     "baseUrl": ".",
     "paths": { "@/*": ["./*"], "@shared/*": ["./shared/*"] }
   },
-  "include": ["App.tsx", "Home.tsx", "main.tsx", "index.css", "routers.ts", "db.ts", "schema.ts", "trpc.ts", "useAuth.ts", "llm.ts", "env.ts", "vite-env.d.ts", "drizzle/**/*.ts", "shared/**/*.ts", "_core/**/*.ts", "components/**/*.tsx", "contexts/**/*.tsx", "lib/**/*.ts", "pages/**/*.tsx", "hooks/**/*.ts", "personal-ai-os.test.ts"],
+  "include": ["App.tsx", "Home.tsx", "main.tsx", "index.css", "routers.ts", "db.ts", "schema.ts", "trpc.ts", "useAuth.ts", "llm.ts", "env.ts", "vite-env.d.ts", "drizzle/**/*.ts", "shared/**/*.ts", "_core/**/*.ts", "components/**/*.tsx", "contexts/**/*.tsx", "lib/**/*.ts", "pages/**/*.tsx", "hooks/**/*.ts", "personal-ai-os.test.ts", "pdf-parse.d.ts"],
   "exclude": ["node_modules", "dist", "DashboardLayout.tsx", "Map.tsx", "test-plan-my-week.ts", "server"]
 }

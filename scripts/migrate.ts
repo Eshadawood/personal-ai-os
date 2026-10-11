@@ -7,8 +7,12 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is required to run migrations.");
 
 const parsed = new URL(url);
-const tlsEnabled = process.env.VERCEL === "1" || process.env.NODE_ENV === "production" || process.env.DATABASE_SSL === "true";
-const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
+const tlsEnabled =
+  process.env.VERCEL === "1" ||
+  process.env.NODE_ENV === "production" ||
+  process.env.DATABASE_SSL === "true";
+const rejectUnauthorized =
+  process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
 const connection = await mysql.createConnection({
   host: parsed.hostname,
   port: parsed.port ? Number(parsed.port) : 3306,
@@ -21,6 +25,7 @@ const connection = await mysql.createConnection({
 const migrationFiles = [
   "drizzle/0001_sleepy_morph.sql",
   "drizzle/0002_auth_sessions.sql",
+  "drizzle/0003_personal_os_features.sql",
 ];
 
 try {
@@ -50,13 +55,18 @@ try {
     const sql = await readFile(path.resolve(file), "utf8");
     const statements = sql
       .split(/(?:--> statement-breakpoint|;\s*$)/m)
-      .map(statement => statement.trim())
+      .map((statement) => statement.trim())
       .filter(Boolean)
-      .map(statement => statement.replace(/^CREATE TABLE `/i, "CREATE TABLE IF NOT EXISTS `"));
+      .map((statement) =>
+        statement.replace(/^CREATE TABLE `/i, "CREATE TABLE IF NOT EXISTS `"),
+      );
 
     for (const statement of statements) {
       const normalized = statement
-        .replace(/^ALTER TABLE `users` ADD COLUMN /i, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS ")
+        .replace(
+          /^ALTER TABLE `users` ADD COLUMN /i,
+          "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS ",
+        )
         .replace(/^CREATE INDEX /i, "CREATE INDEX IF NOT EXISTS ");
       try {
         await connection.query(normalized);
@@ -64,7 +74,8 @@ try {
         // Existing indexes/columns can still be reported as duplicate by older
         // TiDB/MySQL versions; all other errors must fail the deployment.
         const code = (error as { code?: string }).code;
-        if (code !== "ER_DUP_KEYNAME" && code !== "ER_DUP_FIELDNAME") throw error;
+        if (code !== "ER_DUP_KEYNAME" && code !== "ER_DUP_FIELDNAME")
+          throw error;
       }
     }
     console.log(`Applied ${file}`);
